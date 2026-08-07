@@ -86,7 +86,7 @@ export default function Home() {
   }, [fetchRates]);
 
   return (
-    <div className="max-w-md mx-auto p-4 space-y-4">
+    div className="p-4 bg-red-500 text-white font-bold text-center text-xl rounded-xl">
       {/* 4 Metals Grid */}
       <div className="space-y-3">
         <RateCard
