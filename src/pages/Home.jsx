@@ -10,10 +10,12 @@ export default function Home() {
   const [data, setData] = useState({
     gold_per_tola_pkr: 425734,
     silver_per_tola_pkr: 6065,
-    platinum_per_tola_pkr: 115000,
+    platinum_per_tola_pkr: 310000,
+    copper_per_kg_pkr: 3500,
     gold_change_pct: 0.45,
     silver_change_pct: 1.20,
     platinum_change_pct: 0.80,
+    copper_change_pct: -0.50,
     usd_pkr: 278.70,
     timestamp: new Date().toISOString()
   });
@@ -25,42 +27,30 @@ export default function Home() {
     else setLoading(true);
     
     try {
-      // 1. Live USD to PKR rate
       const currencyRes = await fetch('https://open.er-api.com/v6/latest/USD');
       const currencyJson = await currencyRes.json();
       const liveUsdPkr = currencyJson?.rates?.PKR || 278.70;
 
-      // 2. Default fallback prices per ounce (USD)
       let goldOunceUSD = 2450;
       let silverOunceUSD = 30;
       let platinumOunceUSD = 980;
       
       try {
-        // Fetch Gold
         const metalRes = await fetch('https://api.gold-api.com/price/XAU');
         const metalJson = await metalRes.json();
-        if (metalJson && metalJson.price) {
-          goldOunceUSD = metalJson.price;
-        }
+        if (metalJson?.price) goldOunceUSD = metalJson.price;
 
-        // Fetch Silver
         const silverRes = await fetch('https://api.gold-api.com/price/XAG');
         const silverJson = await silverRes.json();
-        if (silverJson && silverJson.price) {
-          silverOunceUSD = silverJson.price;
-        }
+        if (silverJson?.price) silverOunceUSD = silverJson.price;
 
-        // Fetch Platinum
         const platRes = await fetch('https://api.gold-api.com/price/XPT');
         const platJson = await platRes.json();
-        if (platJson && platJson.price) {
-          platinumOunceUSD = platJson.price;
-        }
+        if (platJson?.price) platinumOunceUSD = platJson.price;
       } catch (err) {
-        console.log("Using fallback metal prices due to network error", err);
+        console.log("Using fallback metal prices", err);
       }
 
-      // Calculations for Tola (1 Tola = 11.664 grams, 1 Ounce = 31.1035 grams)
       const calculatedGoldTola = Math.round((goldOunceUSD / 31.1035) * 11.664 * liveUsdPkr);
       const calculatedSilverTola = Math.round((silverOunceUSD / 31.1035) * 11.664 * liveUsdPkr);
       const calculatedPlatinumTola = Math.round((platinumOunceUSD / 31.1035) * 11.664 * liveUsdPkr);
@@ -69,9 +59,11 @@ export default function Home() {
         gold_per_tola_pkr: calculatedGoldTola,
         silver_per_tola_pkr: calculatedSilverTola,
         platinum_per_tola_pkr: calculatedPlatinumTola,
+        copper_per_kg_pkr: 3500,
         gold_change_pct: 0.45,
         silver_change_pct: 1.20,
         platinum_change_pct: 0.80,
+        copper_change_pct: -0.50,
         usd_pkr: liveUsdPkr,
         timestamp: new Date().toISOString()
       });
@@ -102,7 +94,7 @@ export default function Home() {
 
   return (
     <div className="space-y-4">
-      {/* Hero rates: Gold, Silver, Platinum */}
+      {/* Hero rates: Gold, Silver, Platinum, Copper */}
       <div className="space-y-3">
         <RateCard
           metal="gold"
@@ -126,6 +118,14 @@ export default function Home() {
           changePct={data?.platinum_change_pct}
           isFavorite={favoriteMetal === 'platinum'}
           onToggleFavorite={() => toggleFavorite('platinum')}
+          loading={loading}
+        />
+        <RateCard
+          metal="copper"
+          pricePerTola={data?.copper_per_kg_pkr}
+          changePct={data?.copper_change_pct}
+          isFavorite={favoriteMetal === 'copper'}
+          onToggleFavorite={() => toggleFavorite('copper')}
           loading={loading}
         />
       </div>
