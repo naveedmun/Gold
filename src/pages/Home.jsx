@@ -29,7 +29,7 @@ export default function Home() {
       const currencyJson = await currencyRes.json();
       const liveUsdPkr = currencyJson?.rates?.PKR || 278.70;
 
-      // 2. Default Prices (Ounce mein)
+      // 2. Default Prices (USD Ounce)
       let goldOunceUSD = 2450;
       let silverOunceUSD = 30;
       let platinumOunceUSD = 980;
@@ -76,7 +76,7 @@ export default function Home() {
     }
   }, []);
 
-  // Har 5 second baad auto update
+  // Har 5 second baad auto update cycle
   useEffect(() => {
     fetchRates();
     const interval = setInterval(() => {
@@ -86,7 +86,7 @@ export default function Home() {
   }, [fetchRates]);
 
   return (
-    div className="p-4 bg-red-500 text-white font-bold text-center text-xl rounded-xl">
+    <div className="max-w-md mx-auto p-4 space-y-4">
       {/* 4 Metals Grid */}
       <div className="space-y-3">
         <RateCard
