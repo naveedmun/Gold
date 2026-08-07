@@ -13,18 +13,23 @@ export default function RateCard({
   const metalName = metal.toLowerCase();
   const isGold = metalName === 'gold';
   const isPlatinum = metalName === 'platinum';
+  const isCopper = metalName === 'copper';
 
   const gradient = isGold
     ? 'from-[#D4AF37]/10 to-[#B8860B]/5 dark:from-[#D4AF37]/15 dark:to-[#B8860B]/5'
     : isPlatinum
     ? 'from-[#E5E4E2]/20 to-[#959595]/10 dark:from-[#E5E4E2]/15 dark:to-[#959595]/5'
+    : isCopper
+    ? 'from-[#B87333]/15 to-[#8C5830]/5 dark:from-[#B87333]/20 dark:to-[#8C5830]/5'
     : 'from-[#C0C0C0]/10 to-[#A0A0A0]/5 dark:from-[#C0C0C0]/15 dark:to-[#808080]/5';
 
-  const accent = isGold ? 'text-[#D4AF37]' : isPlatinum ? 'text-gray-300' : 'text-[#C0C0C0]';
+  const accent = isGold ? 'text-[#D4AF37]' : isPlatinum ? 'text-gray-300' : isCopper ? 'text-[#B87333]' : 'text-[#C0C0C0]';
   const iconBg = isGold
     ? 'bg-gradient-to-br from-[#D4AF37] to-[#B8860B]'
     : isPlatinum
     ? 'bg-gradient-to-br from-gray-400 to-gray-600'
+    : isCopper
+    ? 'bg-gradient-to-br from-[#B87333] to-[#8C5830]'
     : 'bg-gradient-to-br from-[#C0C0C0] to-[#808080]';
   
   const isPositive = changePct >= 0;
@@ -42,7 +47,7 @@ export default function RateCard({
           </div>
           <div>
             <p className="font-heading font-semibold text-base capitalize">{metal}</p>
-            <p className="text-xs text-muted-foreground">per Tola</p>
+            <p className="text-xs text-muted-foreground">{isCopper ? 'per Kg' : 'per Tola'}</p>
           </div>
         </div>
         <button onClick={onToggleFavorite} className="p-1.5 rounded-lg hover:bg-background/50 transition-colors">
