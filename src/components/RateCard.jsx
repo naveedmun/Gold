@@ -10,15 +10,23 @@ export default function RateCard({
   onToggleFavorite,
   loading
 }) {
-  const isGold = metal === 'gold';
+  const metalName = metal.toLowerCase();
+  const isGold = metalName === 'gold';
+  const isPlatinum = metalName === 'platinum';
+
   const gradient = isGold
     ? 'from-[#D4AF37]/10 to-[#B8860B]/5 dark:from-[#D4AF37]/15 dark:to-[#B8860B]/5'
+    : isPlatinum
+    ? 'from-[#E5E4E2]/20 to-[#959595]/10 dark:from-[#E5E4E2]/15 dark:to-[#959595]/5'
     : 'from-[#C0C0C0]/10 to-[#A0A0A0]/5 dark:from-[#C0C0C0]/15 dark:to-[#808080]/5';
 
-  const accent = isGold ? 'text-[#D4AF37]' : 'text-[#C0C0C0]';
+  const accent = isGold ? 'text-[#D4AF37]' : isPlatinum ? 'text-gray-300' : 'text-[#C0C0C0]';
   const iconBg = isGold
     ? 'bg-gradient-to-br from-[#D4AF37] to-[#B8860B]'
+    : isPlatinum
+    ? 'bg-gradient-to-br from-gray-400 to-gray-600'
     : 'bg-gradient-to-br from-[#C0C0C0] to-[#808080]';
+  
   const isPositive = changePct >= 0;
 
   return (
@@ -33,7 +41,7 @@ export default function RateCard({
             )}
           </div>
           <div>
-            <p className="font-heading font-semibold text-base">{isGold ? 'Gold' : 'Silver'}</p>
+            <p className="font-heading font-semibold text-base capitalize">{metal}</p>
             <p className="text-xs text-muted-foreground">per Tola</p>
           </div>
         </div>
