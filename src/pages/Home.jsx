@@ -11,7 +11,7 @@ export default function Home() {
     gold_per_tola_pkr: 425734,
     silver_per_tola_pkr: 6065,
     platinum_per_tola_pkr: 310000,
-    copper_per_kg_pkr: 3500,
+    copper_per_tola_pkr: 3500,
     gold_change_pct: 0.45,
     silver_change_pct: 1.20,
     platinum_change_pct: 0.80,
@@ -19,169 +19,141 @@ export default function Home() {
     usd_pkr: 278.70,
     timestamp: new Date().toISOString()
   });
+
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchRates = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
-    
+
     try {
+      // 1. Fetch USD to PKR Rate
       const currencyRes = await fetch('https://open.er-api.com/v6/latest/USD');
       const currencyJson = await currencyRes.json();
       const liveUsdPkr = currencyJson?.rates?.PKR || 278.70;
 
+      // Default/Fallback values in USD Ounce
       let goldOunceUSD = 2450;
       let silverOunceUSD = 30;
       let platinumOunceUSD = 980;
-      
+      let copperOunceUSD = 4.20; // Copper / lb converted
+
       try {
-        const metalRes = await fetch('https://api.gold-api.com/price/XAU');
-        const metalJson = await metalRes.json();
-        if (metalJson?.price) goldOunceUSD = metalJson.price;
+        const [goldRes, silverRes, platRes, copperRes] = await Promise.all([
+          fetch('https://api.gold-api.com/price/XAU'),
+          fetch('https://api.gold-api.com/price/XAG'),
+          fetch('https://api.gold-api.com/price/XPT'),
+          fetch('https://api.gold-api.com/price/XCU')
+        ]);
 
-        const silverRes = await fetch('https://api.gold-api.com/price/XAG');
+        const goldJson = await goldRes.json();
         const silverJson = await silverRes.json();
-        if (silverJson?.price) silverOunceUSD = silverJson.price;
-
-        const platRes = await fetch('https://api.gold-api.com/price/XPT');
         const platJson = await platRes.json();
+        const copperJson = await copperRes.json();
+
+        if (goldJson?.price) goldOunceUSD = goldJson.price;
+        if (silverJson?.price) silverOunceUSD = silverJson.price;
         if (platJson?.price) platinumOunceUSD = platJson.price;
+        if (copperJson?.price) copperOunceUSD = copperJson.price;
       } catch (err) {
-        console.log("Using fallback metal prices", err);
+        console.log('Using fallback metal prices', err);
       }
 
-      const calculatedGoldTola = Math.round((goldOunceUSD / 31.1035) * 11.664 * liveUsdPkr);
-      const calculatedSilverTola = Math.round((silverOunceUSD / 31.1035) * 11.664 * liveUsdPkr);
-      const calculatedPlatinumTola = Math.round((platinumOunceUSD / 31.1035) * 11.664 * liveUsdPkr);
+      // Formula: USD/oz * USD_PKR * 0.375 = PKR per Tola
+      const tolaFactor = 0.375;
 
-      setData({
-        gold_per_tola_pkr: calculatedGoldTola,
-        silver_per_tola_pkr: calculatedSilverTola,
-        platinum_per_tola_pkr: calculatedPlatinumTola,
-        copper_per_kg_pkr: 3500,
-        gold_change_pct: 0.45,
-        silver_change_pct: 1.20,
-        platinum_change_pct: 0.80,
-        copper_change_pct: -0.50,
+      setData(prev => ({
+        ...prev,
+        gold_per_tola_pkr: Math.round(goldOunceUSD * liveUsdPkr * tolaFactor),
+        silver_per_tola_pkr: Math.round(silverOunceUSD * liveUsdPkr * tolaFactor),
+        platinum_per_tola_pkr: Math.round(platinumOunceUSD * liveUsdPkr * tolaFactor),
+        copper_per_tola_pkr: Math.round(copperOunceUSD * liveUsdPkr * tolaFactor),
         usd_pkr: liveUsdPkr,
         timestamp: new Date().toISOString()
-      });
+      }));
+
     } catch (error) {
-      console.error("Error fetching live rates:", error);
+      console.error('Error fetching rates:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
+  // Live Auto Refresh (Har 10 Seconds baad)
   useEffect(() => {
     fetchRates();
-  }, [fetchRates]);
-
-  useEffect(() => {
-    if (autoRefresh > 0) {
-      const interval = setInterval(() => fetchRates(true), autoRefresh * 1000);
+    if (autoRefresh) {
+      const interval = setInterval(() => {
+        fetchRates(true);
+      }, 10000); // 10 seconds
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, fetchRates]);
-
-  const toggleFavorite = (metal) => {
-    setFavoriteMetal(favoriteMetal === metal ? 'gold' : metal);
-  };
-
-  const lastUpdated = data?.timestamp ? new Date(data.timestamp) : null;
+  }, [fetchRates, autoRefresh]);
 
   return (
     <div className="space-y-4">
-      {/* Hero rates: Gold, Silver, Platinum, Copper */}
-      <div className="space-y-3">
+      {/* Rate Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* GOLD */}
         <RateCard
-          metal="gold"
-          pricePerTola={data?.gold_per_tola_pkr}
-          changePct={data?.gold_change_pct}
-          isFavorite={favoriteMetal === 'gold'}
-          onToggleFavorite={() => toggleFavorite('gold')}
-          loading={loading}
+          name="Gold"
+          unit="per Tola"
+          price={data.gold_per_tola_pkr}
+          change={data.gold_change_pct}
+          symbol="XAU"
         />
+
+        {/* SILVER */}
         <RateCard
-          metal="silver"
-          pricePerTola={data?.silver_per_tola_pkr}
-          changePct={data?.silver_change_pct}
-          isFavorite={favoriteMetal === 'silver'}
-          onToggleFavorite={() => toggleFavorite('silver')}
-          loading={loading}
+          name="Silver"
+          unit="per Tola"
+          price={data.silver_per_tola_pkr}
+          change={data.silver_change_pct}
+          symbol="XAG"
         />
+
+        {/* PLATINUM */}
         <RateCard
-          metal="platinum"
-          pricePerTola={data?.platinum_per_tola_pkr}
-          changePct={data?.platinum_change_pct}
-          isFavorite={favoriteMetal === 'platinum'}
-          onToggleFavorite={() => toggleFavorite('platinum')}
-          loading={loading}
+          name="Platinum"
+          unit="per Tola"
+          price={data.platinum_per_tola_pkr}
+          change={data.platinum_change_pct}
+          symbol="XPT"
         />
+
+        {/* COPPER */}
         <RateCard
-          metal="copper"
-          pricePerTola={data?.copper_per_kg_pkr}
-          changePct={data?.copper_change_pct}
-          isFavorite={favoriteMetal === 'copper'}
-          onToggleFavorite={() => toggleFavorite('copper')}
-          loading={loading}
+          name="Copper"
+          unit="per Tola"
+          price={data.copper_per_tola_pkr}
+          change={data.copper_change_pct}
+          symbol="XCU"
         />
       </div>
 
-      {/* USD/PKR + Last Updated */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <DollarSign className="h-4 w-4" />
-            <span className="text-xs font-medium">USD / PKR</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold">
-            {loading ? <span className="inline-block h-7 w-20 animate-pulse rounded bg-muted" /> : formatPKR(data?.usd_pkr)}
-          </p>
+      {/* Info Bar */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-gray-100">
+          <span className="text-xs text-gray-500">$ USD / PKR</span>
+          <p className="text-xl font-bold">{data.usd_pkr}</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span className="text-xs font-medium">Last Updated</span>
-          </div>
-          <p className="mt-2 text-sm font-semibold">
-            {lastUpdated ? lastUpdated.toLocaleTimeString() : '—'}
-          </p>
-          {lastUpdated && (
-            <p className="text-xs text-muted-foreground">{lastUpdated.toLocaleDateString()}</p>
-          )}
+        <div className="bg-white p-4 rounded-xl border border-gray-100">
+          <span className="text-xs text-gray-500">Last Updated</span>
+          <p className="text-sm font-semibold">{new Date(data.timestamp).toLocaleTimeString()}</p>
         </div>
       </div>
 
-      {/* Refresh button */}
+      {/* Refresh Button */}
       <button
         onClick={() => fetchRates(true)}
         disabled={refreshing}
-        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#B8860B] px-4 py-3.5 text-white font-semibold shadow-lg shadow-[#D4AF37]/20 transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+        className="w-full py-3 bg-amber-600 text-white font-medium rounded-xl flex items-center justify-center gap-2"
       >
-        <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
-        {refreshing ? 'Refreshing...' : 'Refresh Rates'}
+        <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+        Refresh Rates
       </button>
-
-      {/* Quick links */}
-      <div className="grid grid-cols-2 gap-3 pt-2">
-        <Link to="/calculator" className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 hover:border-[#D4AF37]/40 transition-colors">
-          <div>
-            <p className="font-semibold text-sm">Calculator</p>
-            <p className="text-xs text-muted-foreground">Gram, Tola, Ounce</p>
-          </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        </Link>
-        <Link to="/charts" className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 hover:border-[#D4AF37]/40 transition-colors">
-          <div>
-            <p className="font-semibold text-sm">Charts</p>
-            <p className="text-xs text-muted-foreground">Price trends</p>
-          </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        </Link>
-      </div>
     </div>
   );
 }
