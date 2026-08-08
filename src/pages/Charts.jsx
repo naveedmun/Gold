@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { BarChart2, LineChart } from 'lucide-react';
-import { formatPKR } from '@/lib/conversions';
+import { formatCurrency, LATEST_RATES } from '@/lib/conversions';
 
 export default function Charts() {
+  const { currency = 'PKR' } = useOutletContext() || {};
   const [selectedMetal, setSelectedMetal] = useState('gold');
   const [timeframe, setTimeframe] = useState('10Y');
   const [chartType, setChartType] = useState('line');
+
+  // USD Rate benchmark
+  const USD_RATE = LATEST_RATES?.usdPkr || 278.70;
 
   const getHistoricalData = () => {
     const isGold = selectedMetal === 'gold';
@@ -13,39 +18,39 @@ export default function Charts() {
     switch (timeframe) {
       case '1D':
         return [
-          { label: '9 AM', price: isGold ? 424000 : 6000 },
-          { label: '12 PM', price: isGold ? 424800 : 6020 },
-          { label: '3 PM', price: isGold ? 425200 : 6050 },
-          { label: '6 PM', price: isGold ? 425734 : 6065 },
+          { label: '9 AM', price: isGold ? 450000 : 6850 },
+          { label: '12 PM', price: isGold ? 451800 : 6880 },
+          { label: '3 PM', price: isGold ? 453200 : 6910 },
+          { label: '6 PM', price: isGold ? 454300 : 6940 },
         ];
       case '1W':
         return [
-          { label: 'Mon', price: isGold ? 421000 : 5850 },
-          { label: 'Wed', price: isGold ? 422800 : 5960 },
-          { label: 'Fri', price: isGold ? 423800 : 5990 },
-          { label: 'Today', price: isGold ? 425734 : 6065 },
+          { label: 'Mon', price: isGold ? 448000 : 6750 },
+          { label: 'Wed', price: isGold ? 450500 : 6820 },
+          { label: 'Fri', price: isGold ? 452800 : 6890 },
+          { label: 'Today', price: isGold ? 454300 : 6940 },
         ];
       case '1M':
         return [
-          { label: 'Week 1', price: isGold ? 412000 : 5700 },
-          { label: 'Week 2', price: isGold ? 418000 : 5820 },
-          { label: 'Week 3', price: isGold ? 421500 : 5910 },
-          { label: 'Week 4', price: isGold ? 425734 : 6065 },
+          { label: 'Week 1', price: isGold ? 442000 : 6650 },
+          { label: 'Week 2', price: isGold ? 446000 : 6740 },
+          { label: 'Week 3', price: isGold ? 450000 : 6850 },
+          { label: 'Week 4', price: isGold ? 454300 : 6940 },
         ];
       case '1Y':
         return [
           { label: '2025 Q3', price: isGold ? 360000 : 4900 },
           { label: '2025 Q4', price: isGold ? 520000 : 7100 },
           { label: '2026 Q1', price: isGold ? 410000 : 5600 },
-          { label: '2026 Q3', price: isGold ? 425734 : 6065 },
+          { label: '2026 Q3', price: isGold ? 454300 : 6940 },
         ];
       case '5Y':
         return [
           { label: '2022', price: isGold ? 150000 : 1800 },
           { label: '2023', price: isGold ? 220000 : 2500 },
           { label: '2024', price: isGold ? 285000 : 3400 },
-          { label: '2025 Peak', price: isGold ? 520000 : 7100 }, // Exact Match 520k
-          { label: '2026', price: isGold ? 425734 : 6065 },
+          { label: '2025 Peak', price: isGold ? 520000 : 7100 },
+          { label: '2026', price: isGold ? 454300 : 6940 },
         ];
       case '10Y':
       default:
@@ -55,8 +60,8 @@ export default function Charts() {
           { label: '2020', price: isGold ? 115000 : 1400 },
           { label: '2022', price: isGold ? 150000 : 1800 },
           { label: '2024', price: isGold ? 285000 : 3400 },
-          { label: '2025 High', price: isGold ? 520000 : 7100 }, // Exact Match 520k
-          { label: '2026', price: isGold ? 425734 : 6065 },
+          { label: '2025 High', price: isGold ? 520000 : 7100 },
+          { label: '2026', price: isGold ? 454300 : 6940 },
         ];
     }
   };
@@ -68,6 +73,15 @@ export default function Charts() {
   const startPrice = prices[0];
   const endPrice = prices[prices.length - 1];
   const changePct = (((endPrice - startPrice) / startPrice) * 100).toFixed(1);
+
+  // Helper to format short labels for graph axes (e.g., $1.6k or 454k)
+  const formatShortValue = (pkrAmount) => {
+    if (currency === 'USD') {
+      const usdVal = pkrAmount / USD_RATE;
+      return `$${usdVal >= 1000 ? (usdVal / 1000).toFixed(1) + 'k' : usdVal.toFixed(0)}`;
+    }
+    return pkrAmount >= 100000 ? `${(pkrAmount / 1000).toFixed(0)}k` : pkrAmount;
+  };
 
   const generateSvgPath = () => {
     const width = 100;
@@ -87,7 +101,7 @@ export default function Charts() {
   };
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto p-2">
+    <div className="space-y-4 max-w-2xl mx-auto p-2 pb-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Price Charts</h1>
@@ -163,7 +177,7 @@ export default function Charts() {
               return (
                 <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end gap-2">
                   <span className="text-[10px] font-bold text-muted-foreground">
-                    {item.price >= 100000 ? `${(item.price / 1000).toFixed(0)}k` : item.price}
+                    {formatShortValue(item.price)}
                   </span>
                   <div
                     style={{ height: `${heightPercent}%` }}
@@ -192,7 +206,7 @@ export default function Charts() {
                 <div key={idx} className="text-center">
                   <p className="text-[11px] font-semibold text-muted-foreground">{item.label}</p>
                   <p className="text-[10px] font-bold text-foreground">
-                    {item.price >= 100000 ? `${(item.price / 1000).toFixed(0)}k` : item.price}
+                    {formatShortValue(item.price)}
                   </p>
                 </div>
               ))}
@@ -204,11 +218,15 @@ export default function Charts() {
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-xs text-muted-foreground">High</p>
-          <p className="text-sm font-bold text-foreground mt-0.5">Rs {formatPKR(maxPrice)}</p>
+          <p className="text-sm font-bold text-foreground mt-0.5">
+            {formatCurrency(maxPrice, currency, USD_RATE)}
+          </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-xs text-muted-foreground">Low</p>
-          <p className="text-sm font-bold text-foreground mt-0.5">Rs {formatPKR(minPrice)}</p>
+          <p className="text-sm font-bold text-foreground mt-0.5">
+            {formatCurrency(minPrice, currency, USD_RATE)}
+          </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-xs text-muted-foreground">Change</p>
