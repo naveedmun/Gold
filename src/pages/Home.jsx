@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { RefreshCw, TrendingUp, Clock, AlertCircle } from 'lucide-react';
-import { formatPKR } from '@/lib/conversions';
+import { formatCurrency } from '@/lib/conversions';
 
 export default function Home() {
+  // Read selected currency from Layout header context (Default: PKR)
+  const { currency = 'PKR' } = useOutletContext() || {};
+
   const [rates] = useState({
     goldTola: 454300,
     silverTola: 6940,
     platinumTola: 123000,
     copperTola: 3750,
-    usdPkr: 278.70,
+    usdPkr: 278.70, // USD Exchange Rate
   });
 
   const [isMarketOpen, setIsMarketOpen] = useState(false);
@@ -17,6 +21,14 @@ export default function Home() {
     const day = new Date().getDay();
     setIsMarketOpen(day !== 0 && day !== 6);
   }, []);
+
+  // Helper function: PKR to USD Conversion
+  const getDisplayPrice = (priceInPKR) => {
+    if (currency === 'USD') {
+      return priceInPKR / rates.usdPkr;
+    }
+    return priceInPKR;
+  };
 
   return (
     <div className="space-y-4 max-w-xl mx-auto p-2 pb-6">
@@ -64,7 +76,7 @@ export default function Home() {
         </div>
         <div className="flex items-baseline justify-between pt-1">
           <p className="text-3xl font-extrabold text-foreground tracking-tight">
-            Rs {formatPKR(rates.goldTola)}
+            {formatCurrency(getDisplayPrice(rates.goldTola), currency)}
           </p>
           <span className="text-xs font-semibold text-emerald-600 flex items-center gap-0.5">
             <TrendingUp className="h-3.5 w-3.5" /> +1.14%
@@ -83,7 +95,7 @@ export default function Home() {
           </span>
         </div>
         <p className="text-2xl font-bold text-foreground mt-1">
-          Rs {formatPKR(rates.silverTola)}
+          {formatCurrency(getDisplayPrice(rates.silverTola), currency)}
         </p>
       </div>
 
@@ -95,7 +107,7 @@ export default function Home() {
             Platinum (1 Tola)
           </span>
           <p className="text-xl font-bold text-foreground mt-1">
-            Rs {formatPKR(rates.platinumTola)}
+            {formatCurrency(getDisplayPrice(rates.platinumTola), currency)}
           </p>
         </div>
 
@@ -105,7 +117,7 @@ export default function Home() {
             Copper (1 Tola)
           </span>
           <p className="text-xl font-bold text-foreground mt-1">
-            Rs {formatPKR(rates.copperTola)}
+            {formatCurrency(getDisplayPrice(rates.copperTola), currency)}
           </p>
         </div>
       </div>
