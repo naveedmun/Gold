@@ -4,13 +4,19 @@ import { LATEST_RATES, formatCurrency, getUsdSubtext } from '@/lib/conversions';
 
 export default function Calculator() {
   const { currency = 'PKR' } = useOutletContext() || {};
-  const [metal, setMetal] = useState('gold');
-  const [mode, setMode] = useState('weightToValue');
-  const [unit, setUnit] = useState('tola');
+  const [metal, setMetal] = useState('gold'); // 'gold' | 'silver'
+  const [mode, setMode] = useState('weightToValue'); // 'weightToValue' | 'valueToWeight'
+  const [unit, setUnit] = useState('tola'); // 'gram' | 'tenGram' | 'tola' | 'ounce'
   const [inputValue, setInputValue] = useState('');
 
-  const currentRatePerTola = metal === 'gold' ? LATEST_RATES.gold : LATEST_RATES.silver;
+  // Synchronized rates
+  const DEFAULT_GOLD_TOLA = LATEST_RATES?.gold || 454300;
+  const DEFAULT_SILVER_TOLA = LATEST_RATES?.silver || 6940;
+  const USD_RATE = LATEST_RATES?.usdPkr || 285;
 
+  const currentRatePerTola = metal === 'gold' ? DEFAULT_GOLD_TOLA : DEFAULT_SILVER_TOLA;
+
+  // Conversions relative to 1 Tola (11.6638 grams)
   const getFactor = (selectedUnit) => {
     switch (selectedUnit) {
       case 'gram':
@@ -34,11 +40,12 @@ export default function Calculator() {
     const pricePerUnit = currentRatePerTola * factor;
 
     if (mode === 'weightToValue') {
-      return val * pricePerUnit; // Total price in PKR
+      // Return total price in PKR base
+      return val * pricePerUnit;
     } else {
-      // Input is in active currency, convert back to PKR if needed
-      const amountInPKR = currency === 'USD' ? val * LATEST_RATES.usdPkr : val;
-      return amountInPKR / pricePerUnit; // Weight in chosen unit
+      // Convert entered amount to PKR if input is in USD
+      const amountInPKR = currency === 'USD' ? val * USD_RATE : val;
+      return amountInPKR / pricePerUnit;
     }
   };
 
@@ -75,12 +82,12 @@ export default function Calculator() {
       <div className="p-4 rounded-2xl bg-card border border-border">
         <p className="text-xs text-muted-foreground">Current {metal} rate</p>
         <p className="text-xl font-extrabold text-foreground mt-0.5">
-          {formatCurrency(currentRatePerTola, currency)}{' '}
+          {formatCurrency(currentRatePerTola, currency, USD_RATE)}{' '}
           <span className="text-xs font-normal text-muted-foreground">/ Tola</span>
         </p>
-        {getUsdSubtext(currentRatePerTola, currency) && (
+        {getUsdSubtext(currentRatePerTola, currency, USD_RATE) && (
           <p className="text-xs text-muted-foreground mt-0.5">
-            {getUsdSubtext(currentRatePerTola, currency)}
+            {getUsdSubtext(currentRatePerTola, currency, USD_RATE)}
           </p>
         )}
       </div>
@@ -123,8 +130,8 @@ export default function Calculator() {
       {/* Input Field */}
       <div className="space-y-1.5">
         <label className="text-xs font-bold text-foreground">
-          {mode === 'weightToValue' 
-            ? `Weight (${unit.toUpperCase()})` 
+          {mode === 'weightToValue'
+            ? `Weight (${unit.toUpperCase()})`
             : `Amount (${currency === 'USD' ? 'USD $' : 'PKR Rs'})`}
         </label>
         <input
@@ -132,8 +139,8 @@ export default function Calculator() {
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           placeholder={
-            mode === 'weightToValue' 
-              ? 'Enter weight' 
+            mode === 'weightToValue'
+              ? 'Enter weight'
               : `Enter amount in ${currency === 'USD' ? 'USD' : 'PKR'}`
           }
           className="w-full p-3 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
@@ -147,10 +154,10 @@ export default function Calculator() {
           <div className="text-2xl font-black text-foreground">
             {mode === 'weightToValue' ? (
               <>
-                <p>{formatCurrency(result, currency)}</p>
-                {getUsdSubtext(result, currency) && (
+                <p>{formatCurrency(result, currency, USD_RATE)}</p>
+                {getUsdSubtext(result, currency, USD_RATE) && (
                   <p className="text-xs font-medium text-muted-foreground mt-0.5">
-                    {getUsdSubtext(result, currency)}
+                    {getUsdSubtext(result, currency, USD_RATE)}
                   </p>
                 )}
               </>
