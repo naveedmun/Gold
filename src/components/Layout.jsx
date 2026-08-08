@@ -1,10 +1,22 @@
-import React, { useState } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
-import { Home, LineChart, History, Calculator, Bell, Settings, X, Globe } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Outlet, NavLink } from 'react-router-down';
+import { Home, LineChart, History, Calculator, Bell, Settings, X, Moon, Sun, Coins, Scale } from 'lucide-react';
 
 export default function Layout() {
   const [currency, setCurrency] = useState('PKR'); // 'PKR' | 'USD'
+  const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
+  const [defaultMetal, setDefaultMetal] = useState('gold'); // 'gold' | 'silver'
+  const [defaultUnit, setDefaultUnit] = useState('tola'); // 'tola' | 'gram' | '10gram' | 'ounce'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Toggle Dark Mode
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -14,29 +26,50 @@ export default function Layout() {
           <div className="h-7 w-7 rounded-lg bg-amber-500 flex items-center justify-center font-black text-black text-xs">
             G
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <h1 className="font-black text-base tracking-tight">
-              GoldRate<span className="text-amber-500">PK</span>
-            </h1>
-            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
-              {currency}
-            </span>
-          </div>
+          <h1 className="font-black text-base tracking-tight">
+            GoldRate<span className="text-amber-500">PK</span>
+          </h1>
         </div>
 
-        {/* Working Settings Button */}
-        <button 
-          onClick={() => setIsSettingsOpen(true)}
-          className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
-          title="Settings"
-        >
-          <Settings className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Main Page Currency Toggle Button */}
+          <div className="flex items-center bg-muted p-0.5 rounded-xl border border-border">
+            <button
+              onClick={() => setCurrency('PKR')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                currency === 'PKR' 
+                  ? 'bg-amber-500 text-black shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              PKR (Rs)
+            </button>
+            <button
+              onClick={() => setCurrency('USD')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                currency === 'USD' 
+                  ? 'bg-amber-500 text-black shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              USD ($)
+            </button>
+          </div>
+
+          {/* Settings Gear Button */}
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+            title="App Settings"
+          >
+            <Settings className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       {/* Main Screen Content */}
       <main className="flex-1 pb-28">
-        <Outlet context={{ currency, setCurrency }} />
+        <Outlet context={{ currency, setCurrency, defaultMetal, defaultUnit }} />
       </main>
 
       {/* Fixed Bottom Container (Branding + Navigation) */}
@@ -76,14 +109,14 @@ export default function Layout() {
         </nav>
       </div>
 
-      {/* SETTINGS POPUP MODAL */}
+      {/* FULL APP SETTINGS MODAL */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card border border-border w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-xl">
+          <div className="bg-card border border-border w-full max-w-sm rounded-2xl p-5 space-y-5 shadow-xl">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
                 <Settings className="w-5 h-5 text-amber-500" />
-                <h3 className="font-bold text-foreground text-base">Settings</h3>
+                <h3 className="font-bold text-foreground text-base">Preferences</h3>
               </div>
               <button 
                 onClick={() => setIsSettingsOpen(false)}
@@ -93,42 +126,82 @@ export default function Layout() {
               </button>
             </div>
 
-            {/* Currency Selector */}
+            {/* 1. Theme Selector */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5" /> Select Display Currency
+                {theme === 'dark' ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />} App Theme
               </label>
-              
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => { setCurrency('PKR'); setIsSettingsOpen(false); }}
-                  className={`p-3 rounded-xl border flex items-center justify-between font-bold text-xs transition-all ${
-                    currency === 'PKR' 
-                      ? 'border-amber-500 bg-amber-500/10 text-amber-500' 
-                      : 'border-border bg-muted/30 text-foreground hover:bg-muted'
+                  onClick={() => setTheme('dark')}
+                  className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                    theme === 'dark' ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border bg-muted/30 text-foreground'
                   }`}
                 >
-                  <span>Pakistani Rupee</span>
-                  <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">PKR</span>
+                  <Moon className="w-4 h-4" /> Dark Mode
                 </button>
-
                 <button
-                  onClick={() => { setCurrency('USD'); setIsSettingsOpen(false); }}
-                  className={`p-3 rounded-xl border flex items-center justify-between font-bold text-xs transition-all ${
-                    currency === 'USD' 
-                      ? 'border-amber-500 bg-amber-500/10 text-amber-500' 
-                      : 'border-border bg-muted/30 text-foreground hover:bg-muted'
+                  onClick={() => setTheme('light')}
+                  className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                    theme === 'light' ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border bg-muted/30 text-foreground'
                   }`}
                 >
-                  <span>US Dollar</span>
-                  <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">USD ($)</span>
+                  <Sun className="w-4 h-4" /> Light Mode
                 </button>
               </div>
             </div>
 
-            <div className="text-[11px] text-muted-foreground bg-muted/40 p-3 rounded-xl">
-              💡 Selecting USD option allows international users to track prices in US Dollars.
+            {/* 2. Default Preferred Metal */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Coins className="w-3.5 h-3.5" /> Preferred Metal
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setDefaultMetal('gold')}
+                  className={`p-2.5 rounded-xl border font-bold text-xs transition-all ${
+                    defaultMetal === 'gold' ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border bg-muted/30 text-foreground'
+                  }`}
+                >
+                  🥇 Gold
+                </button>
+                <button
+                  onClick={() => setDefaultMetal('silver')}
+                  className={`p-2.5 rounded-xl border font-bold text-xs transition-all ${
+                    defaultMetal === 'silver' ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border bg-muted/30 text-foreground'
+                  }`}
+                >
+                  🥈 Silver
+                </button>
+              </div>
             </div>
+
+            {/* 3. Default Unit */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Scale className="w-3.5 h-3.5" /> Default Unit
+              </label>
+              <div className="grid grid-cols-4 gap-1">
+                {['tola', 'gram', '10gram', 'ounce'].map((u) => (
+                  <button
+                    key={u}
+                    onClick={() => setDefaultUnit(u)}
+                    className={`py-2 rounded-xl border text-[11px] font-bold capitalize transition-all ${
+                      defaultUnit === u ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border bg-muted/30 text-foreground'
+                    }`}
+                  >
+                    {u === '10gram' ? '10 Gram' : u}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsSettingsOpen(false)}
+              className="w-full py-2.5 bg-amber-500 text-black font-bold text-xs rounded-xl shadow-md hover:bg-amber-400 transition-all"
+            >
+              Save Preferences
+            </button>
           </div>
         </div>
       )}
