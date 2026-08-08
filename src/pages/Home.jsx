@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { RefreshCw, TrendingUp, Clock, AlertCircle } from 'lucide-react';
-import { formatCurrency } from '@/lib/conversions';
 
 export default function Home() {
   // Read selected currency from Layout header context (Default: PKR)
@@ -22,12 +21,22 @@ export default function Home() {
     setIsMarketOpen(day !== 0 && day !== 6);
   }, []);
 
-  // Helper function: PKR to USD Conversion
-  const getDisplayPrice = (priceInPKR) => {
+  // Helper for direct clean formatting without buggy lib dependencies
+  const formatValue = (amountInPKR) => {
     if (currency === 'USD') {
-      return priceInPKR / rates.usdPkr;
+      const usdAmount = amountInPKR / rates.usdPkr;
+      return `$ ${usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
-    return priceInPKR;
+    return `Rs ${amountInPKR.toLocaleString('en-PK')}`;
+  };
+
+  // Helper to show USD conversion subtext when PKR is active
+  const getUsdSubtext = (amountInPKR) => {
+    if (currency === 'PKR') {
+      const usdAmount = (amountInPKR / rates.usdPkr).toFixed(2);
+      return `(~ $${usdAmount} USD)`;
+    }
+    return null;
   };
 
   return (
@@ -51,7 +60,7 @@ export default function Home() {
             </div>
             <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
               <Clock className="h-3 w-3" />
-              Closing Price: $4,342 / oz
+              Closing Price: $4,342 / oz | USD/PKR: Rs {rates.usdPkr}
             </p>
           </div>
         </div>
@@ -75,9 +84,16 @@ export default function Home() {
           </span>
         </div>
         <div className="flex items-baseline justify-between pt-1">
-          <p className="text-3xl font-extrabold text-foreground tracking-tight">
-            {formatCurrency(getDisplayPrice(rates.goldTola), currency)}
-          </p>
+          <div>
+            <p className="text-3xl font-extrabold text-foreground tracking-tight">
+              {formatValue(rates.goldTola)}
+            </p>
+            {getUsdSubtext(rates.goldTola) && (
+              <p className="text-xs font-medium text-muted-foreground mt-0.5">
+                {getUsdSubtext(rates.goldTola)}
+              </p>
+            )}
+          </div>
           <span className="text-xs font-semibold text-emerald-600 flex items-center gap-0.5">
             <TrendingUp className="h-3.5 w-3.5" /> +1.14%
           </span>
@@ -95,8 +111,13 @@ export default function Home() {
           </span>
         </div>
         <p className="text-2xl font-bold text-foreground mt-1">
-          {formatCurrency(getDisplayPrice(rates.silverTola), currency)}
+          {formatValue(rates.silverTola)}
         </p>
+        {getUsdSubtext(rates.silverTola) && (
+          <p className="text-xs font-medium text-muted-foreground mt-0.5">
+            {getUsdSubtext(rates.silverTola)}
+          </p>
+        )}
       </div>
 
       {/* 3. PLATINUM & 4. COPPER GRID */}
@@ -107,8 +128,13 @@ export default function Home() {
             Platinum (1 Tola)
           </span>
           <p className="text-xl font-bold text-foreground mt-1">
-            {formatCurrency(getDisplayPrice(rates.platinumTola), currency)}
+            {formatValue(rates.platinumTola)}
           </p>
+          {getUsdSubtext(rates.platinumTola) && (
+            <p className="text-[11px] font-medium text-muted-foreground mt-0.5">
+              {getUsdSubtext(rates.platinumTola)}
+            </p>
+          )}
         </div>
 
         {/* COPPER */}
@@ -117,8 +143,13 @@ export default function Home() {
             Copper (1 Tola)
           </span>
           <p className="text-xl font-bold text-foreground mt-1">
-            {formatCurrency(getDisplayPrice(rates.copperTola), currency)}
+            {formatValue(rates.copperTola)}
           </p>
+          {getUsdSubtext(rates.copperTola) && (
+            <p className="text-[11px] font-medium text-muted-foreground mt-0.5">
+              {getUsdSubtext(rates.copperTola)}
+            </p>
+          )}
         </div>
       </div>
     </div>
