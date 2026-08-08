@@ -6,7 +6,8 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
-// Add page imports here
+
+// Page imports
 import Layout from '@/components/Layout';
 import Home from '@/pages/Home';
 import Charts from '@/pages/Charts';
@@ -45,7 +46,9 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<Home />} />
         <Route path="/charts" element={<Charts />} />
         <Route path="/history" element={<History />} />
+        {/* Route for both /calculator and /calc to prevent 404 */}
         <Route path="/calculator" element={<Calculator />} />
+        <Route path="/calc" element={<Calculator />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
@@ -54,9 +57,7 @@ const AuthenticatedApp = () => {
   );
 };
 
-
 function App() {
-
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
@@ -67,7 +68,7 @@ function App() {
         <Toaster />
       </QueryClientProvider>
     </AuthProvider>
-  )
+  );
 }
 
-export default App
+export default App;
