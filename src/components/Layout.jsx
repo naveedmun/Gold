@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, NavLink } from 'react-router-down';
+import { Outlet, NavLink } from 'react-router-dom';
 import { Home, LineChart, History, Calculator, Bell, Settings, X, Moon, Sun, Coins, Scale } from 'lucide-react';
 
 export default function Layout() {
@@ -9,7 +9,7 @@ export default function Layout() {
   const [defaultUnit, setDefaultUnit] = useState('tola'); // 'tola' | 'gram' | '10gram' | 'ounce'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Toggle Dark Mode
+  // Apply Dark/Light Theme to Document Body
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -32,7 +32,7 @@ export default function Layout() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Main Page Currency Toggle Button */}
+          {/* Main Page Quick Currency Toggle */}
           <div className="flex items-center bg-muted p-0.5 rounded-xl border border-border">
             <button
               onClick={() => setCurrency('PKR')}
@@ -56,7 +56,7 @@ export default function Layout() {
             </button>
           </div>
 
-          {/* Settings Gear Button */}
+          {/* Settings Button */}
           <button 
             onClick={() => setIsSettingsOpen(true)}
             className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
@@ -116,7 +116,7 @@ export default function Layout() {
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
                 <Settings className="w-5 h-5 text-amber-500" />
-                <h3 className="font-bold text-foreground text-base">Preferences</h3>
+                <h3 className="font-bold text-foreground text-base">App Settings</h3>
               </div>
               <button 
                 onClick={() => setIsSettingsOpen(false)}
@@ -163,7 +163,7 @@ export default function Layout() {
                     defaultMetal === 'gold' ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border bg-muted/30 text-foreground'
                   }`}
                 >
-                  🥇 Gold
+                  🥇 Gold First
                 </button>
                 <button
                   onClick={() => setDefaultMetal('silver')}
@@ -171,15 +171,15 @@ export default function Layout() {
                     defaultMetal === 'silver' ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border bg-muted/30 text-foreground'
                   }`}
                 >
-                  🥈 Silver
+                  🥈 Silver First
                 </button>
               </div>
             </div>
 
-            {/* 3. Default Unit */}
+            {/* 3. Default Weight Unit */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <Scale className="w-3.5 h-3.5" /> Default Unit
+                <Scale className="w-3.5 h-3.5" /> Preferred Unit
               </label>
               <div className="grid grid-cols-4 gap-1">
                 {['tola', 'gram', '10gram', 'ounce'].map((u) => (
