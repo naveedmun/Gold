@@ -1,114 +1,146 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { Loader2 } from 'lucide-react';
-import { UNITS, convertFromTola, formatPKR, formatNumber } from '@/lib/conversions';
+import React, { useState } from 'react';
+import { formatPKR } from '@/lib/conversions';
 
 export default function Calculator() {
-  const [liveData, setLiveData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [metal, setMetal] = useState('gold');
-  const [unit, setUnit] = useState('tola');
-  const [quantity, setQuantity] = useState('');
-  const [amount, setAmount] = useState('');
-  const [mode, setMode] = useState('weight');
+  const [metal, setMetal] = useState('gold'); // 'gold' | 'silver'
+  const [mode, setMode] = useState('weightToValue'); // 'weightToValue' | 'valueToWeight'
+  const [unit, setUnit] = useState('tola'); // 'gram' | 'tenGram' | 'tola' | 'ounce'
+  const [inputValue, setInputValue] = useState('');
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await base44.functions.invoke('fetchLiveRates', {});
-        setLiveData(res.data);
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
-    })();
-  }, []);
+  // Default market benchmark rates
+  const DEFAULT_GOLD_TOLA = 454300;
+  const DEFAULT_SILVER_TOLA = 6940;
 
-  const perTola = metal === 'gold' ? liveData?.gold_per_tola_pkr : liveData?.silver_per_tola_pkr;
-  const unitPrice = perTola ? convertFromTola(perTola, unit) : 0;
+  const currentRatePerTola = metal === 'gold' ? DEFAULT_GOLD_TOLA : DEFAULT_SILVER_TOLA;
 
-  let totalValue = 0;
-  let calculatedWeight = 0;
+  // Conversions relative to 1 Tola
+  const getFactor = (selectedUnit) => {
+    switch (selectedUnit) {
+      case 'gram':
+        return 1 / 11.6638; // 1 Tola = 11.6638 Grams
+      case 'tenGram':
+        return 10 / 11.6638;
+      case 'tola':
+        return 1;
+      case 'ounce':
+        return 31.1035 / 11.6638;
+      default:
+        return 1;
+    }
+  };
 
-  if (mode === 'weight' && quantity && perTola) {
-    totalValue = unitPrice * parseFloat(quantity);
-  } else if (mode === 'amount' && amount && perTola) {
-    calculatedWeight = parseFloat(amount) / unitPrice;
-  }
+  const calculateResult = () => {
+    const val = parseFloat(inputValue);
+    if (!val || isNaN(val)) return 0;
+
+    const factor = getFactor(unit);
+
+    if (mode === 'weightToValue') {
+      // Input is weight in chosen unit, calculate total price in PKR
+      const pricePerUnit = currentRatePerTola * factor;
+      return val * pricePerUnit;
+    } else {
+      // Input is PKR amount, calculate weight in chosen unit
+      const pricePerUnit = currentRatePerTola * factor;
+      return val / pricePerUnit;
+    }
+  };
+
+  const result = calculateResult();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-xl mx-auto p-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Calculator</h1>
-        <p className="text-sm text-muted-foreground">Calculate gold & silver value</p>
+        <h2 className="text-xl font-black text-foreground">Calculator</h2>
+        <p className="text-xs text-muted-foreground">Calculate gold & silver value quickly</p>
       </div>
 
-      {/* Metal toggle */}
-      <div className="flex gap-2">
-        <button onClick={() => setMetal('gold')} className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors ${metal === 'gold' ? 'bg-[#D4AF37] text-white' : 'bg-card border border-border'}`}>Gold</button>
-        <button onClick={() => setMetal('silver')} className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors ${metal === 'silver' ? 'bg-[#C0C0C0] text-white' : 'bg-card border border-border'}`}>Silver</button>
+      {/* Metal Selection */}
+      <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-xl">
+        <button
+          onClick={() => setMetal('gold')}
+          className={`py-2 text-xs font-bold rounded-lg transition-all ${
+            metal === 'gold' ? 'bg-amber-500 text-black shadow-sm' : 'text-muted-foreground'
+          }`}
+        >
+          Gold
+        </button>
+        <button
+          onClick={() => setMetal('silver')}
+          className={`py-2 text-xs font-bold rounded-lg transition-all ${
+            metal === 'silver' ? 'bg-slate-400 text-black shadow-sm' : 'text-muted-foreground'
+          }`}
+        >
+          Silver
+        </button>
       </div>
 
-      {/* Live rate display */}
-      <div className="rounded-2xl border border-border bg-card p-4">
+      {/* Current Rate Card */}
+      <div className="p-4 rounded-2xl bg-card border border-border">
         <p className="text-xs text-muted-foreground">Current {metal} rate</p>
-        {loading ? (
-          <div className="h-7 w-32 mt-1 animate-pulse rounded bg-muted" />
-        ) : (
-          <p className="text-xl font-bold mt-1">Rs {formatPKR(perTola)} <span className="text-sm text-muted-foreground font-normal">/ Tola</span></p>
-        )}
+        <p className="text-xl font-extrabold text-foreground mt-0.5">
+          Rs {formatPKR(currentRatePerTola)} <span className="text-xs font-normal text-muted-foreground">/ Tola</span>
+        </p>
       </div>
 
-      {/* Mode toggle */}
-      <div className="flex items-center gap-2">
-        <button onClick={() => setMode('weight')} className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-colors ${mode === 'weight' ? 'bg-primary text-primary-foreground' : 'bg-card border border-border'}`}>Weight → Value</button>
-        <button onClick={() => setMode('amount')} className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-colors ${mode === 'amount' ? 'bg-primary text-primary-foreground' : 'bg-card border border-border'}`}>Value → Weight</button>
+      {/* Calculation Mode */}
+      <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-xl">
+        <button
+          onClick={() => setMode('weightToValue')}
+          className={`py-2 text-xs font-bold rounded-lg transition-all ${
+            mode === 'weightToValue' ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground'
+          }`}
+        >
+          Weight → Value
+        </button>
+        <button
+          onClick={() => setMode('valueToWeight')}
+          className={`py-2 text-xs font-bold rounded-lg transition-all ${
+            mode === 'valueToWeight' ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground'
+          }`}
+        >
+          Value → Weight
+        </button>
       </div>
 
-      {/* Unit selector */}
-      <div className="grid grid-cols-4 gap-1.5">
-        {UNITS.map(u => (
-          <button key={u.value} onClick={() => setUnit(u.value)} className={`rounded-lg py-2 text-xs font-semibold transition-colors ${unit === u.value ? 'bg-[#D4AF37] text-white' : 'bg-card border border-border text-muted-foreground'}`}>
-            {u.label.replace('Per ', '')}
+      {/* Unit Selection */}
+      <div className="grid grid-cols-4 gap-1 p-1 bg-muted rounded-xl">
+        {['gram', 'tenGram', 'tola', 'ounce'].map((u) => (
+          <button
+            key={u}
+            onClick={() => setUnit(u)}
+            className={`py-1.5 text-[11px] font-bold rounded-lg transition-all capitalize ${
+              unit === u ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30' : 'text-muted-foreground'
+            }`}
+          >
+            {u === 'tenGram' ? '10 Gram' : u}
           </button>
         ))}
       </div>
 
-      {/* Input */}
-      <div className="rounded-2xl border border-border bg-card p-4">
-        <label className="text-sm font-medium">
-          {mode === 'weight' ? `Weight (${UNITS.find(u => u.value === unit)?.label})` : 'Amount (PKR)'}
+      {/* Input Field */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-bold text-foreground">
+          {mode === 'weightToValue' ? `Weight (${unit.toUpperCase()})` : 'Amount (PKR)'}
         </label>
         <input
           type="number"
-          inputMode="decimal"
-          value={mode === 'weight' ? quantity : amount}
-          onChange={(e) => mode === 'weight' ? setQuantity(e.target.value) : setAmount(e.target.value)}
-          placeholder={mode === 'weight' ? 'Enter weight' : 'Enter amount in PKR'}
-          className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/30"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder={mode === 'weightToValue' ? 'Enter weight' : 'Enter amount in PKR'}
+          className="w-full p-3 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
         />
       </div>
 
-      {/* Result */}
-      {mode === 'weight' && quantity && (
-        <div className="rounded-2xl border border-[#D4AF37]/20 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-5">
-          <p className="text-sm text-muted-foreground">Total Value</p>
-          <p className="text-3xl font-bold mt-1">Rs {formatPKR(totalValue)}</p>
-          <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-2 gap-2 text-xs">
-            <div><span className="text-muted-foreground">Per Gram:</span> Rs {formatPKR(convertFromTola(perTola, 'gram'))}</div>
-            <div><span className="text-muted-foreground">Per Tola:</span> Rs {formatPKR(perTola)}</div>
-            <div><span className="text-muted-foreground">Per 10g:</span> Rs {formatPKR(convertFromTola(perTola, '10gram'))}</div>
-            <div><span className="text-muted-foreground">Per Ounce:</span> Rs {formatPKR(convertFromTola(perTola, 'ounce'))}</div>
-          </div>
-        </div>
-      )}
-
-      {mode === 'amount' && amount && (
-        <div className="rounded-2xl border border-[#D4AF37]/20 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-5">
-          <p className="text-sm text-muted-foreground">Equivalent Weight</p>
-          <p className="text-3xl font-bold mt-1">{formatNumber(calculatedWeight, 4)} <span className="text-lg text-muted-foreground font-normal">{UNITS.find(u => u.value === unit)?.label.replace('Per ', '').toLowerCase()}</span></p>
-          <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-2 gap-2 text-xs">
-            <div><span className="text-muted-foreground">In Grams:</span> {formatNumber(calculatedWeight * (unit === 'tola' ? 11.6638 : unit === '10gram' ? 10 : unit === 'ounce' ? 31.1035 : 1), 3)}g</div>
-            <div><span className="text-muted-foreground">In Tola:</span> {formatNumber(calculatedWeight * (unit === 'gram' ? 1/11.6638 : unit === '10gram' ? 0.1 : unit === 'ounce' ? 1/2.6667 : 1), 4)}</div>
-          </div>
+      {/* Calculation Output */}
+      {inputValue && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/20 to-amber-500/10 border border-amber-500/30 text-center space-y-1">
+          <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Estimated Total</p>
+          <p className="text-2xl font-black text-foreground">
+            {mode === 'weightToValue'
+              ? `Rs ${formatPKR(Math.round(result))}`
+              : `${result.toFixed(4)} ${unit.toUpperCase()}`}
+          </p>
         </div>
       )}
     </div>
