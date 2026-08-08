@@ -1,23 +1,20 @@
 import React, { useState } from 'react';
-import { formatPKR } from '@/lib/conversions';
+import { useOutletContext } from 'react-router-dom';
+import { LATEST_RATES, formatCurrency, getUsdSubtext } from '@/lib/conversions';
 
 export default function Calculator() {
-  const [metal, setMetal] = useState('gold'); // 'gold' | 'silver'
-  const [mode, setMode] = useState('weightToValue'); // 'weightToValue' | 'valueToWeight'
-  const [unit, setUnit] = useState('tola'); // 'gram' | 'tenGram' | 'tola' | 'ounce'
+  const { currency = 'PKR' } = useOutletContext() || {};
+  const [metal, setMetal] = useState('gold');
+  const [mode, setMode] = useState('weightToValue');
+  const [unit, setUnit] = useState('tola');
   const [inputValue, setInputValue] = useState('');
 
-  // Default market benchmark rates
-  const DEFAULT_GOLD_TOLA = 454300;
-  const DEFAULT_SILVER_TOLA = 6940;
+  const currentRatePerTola = metal === 'gold' ? LATEST_RATES.gold : LATEST_RATES.silver;
 
-  const currentRatePerTola = metal === 'gold' ? DEFAULT_GOLD_TOLA : DEFAULT_SILVER_TOLA;
-
-  // Conversions relative to 1 Tola
   const getFactor = (selectedUnit) => {
     switch (selectedUnit) {
       case 'gram':
-        return 1 / 11.6638; // 1 Tola = 11.6638 Grams
+        return 1 / 11.6638;
       case 'tenGram':
         return 10 / 11.6638;
       case 'tola':
@@ -34,22 +31,21 @@ export default function Calculator() {
     if (!val || isNaN(val)) return 0;
 
     const factor = getFactor(unit);
+    const pricePerUnit = currentRatePerTola * factor;
 
     if (mode === 'weightToValue') {
-      // Input is weight in chosen unit, calculate total price in PKR
-      const pricePerUnit = currentRatePerTola * factor;
-      return val * pricePerUnit;
+      return val * pricePerUnit; // Total price in PKR
     } else {
-      // Input is PKR amount, calculate weight in chosen unit
-      const pricePerUnit = currentRatePerTola * factor;
-      return val / pricePerUnit;
+      // Input is in active currency, convert back to PKR if needed
+      const amountInPKR = currency === 'USD' ? val * LATEST_RATES.usdPkr : val;
+      return amountInPKR / pricePerUnit; // Weight in chosen unit
     }
   };
 
   const result = calculateResult();
 
   return (
-    <div className="space-y-4 max-w-xl mx-auto p-4">
+    <div className="space-y-4 max-w-xl mx-auto p-4 pb-6">
       <div>
         <h2 className="text-xl font-black text-foreground">Calculator</h2>
         <p className="text-xs text-muted-foreground">Calculate gold & silver value quickly</p>
@@ -79,8 +75,14 @@ export default function Calculator() {
       <div className="p-4 rounded-2xl bg-card border border-border">
         <p className="text-xs text-muted-foreground">Current {metal} rate</p>
         <p className="text-xl font-extrabold text-foreground mt-0.5">
-          Rs {formatPKR(currentRatePerTola)} <span className="text-xs font-normal text-muted-foreground">/ Tola</span>
+          {formatCurrency(currentRatePerTola, currency)}{' '}
+          <span className="text-xs font-normal text-muted-foreground">/ Tola</span>
         </p>
+        {getUsdSubtext(currentRatePerTola, currency) && (
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {getUsdSubtext(currentRatePerTola, currency)}
+          </p>
+        )}
       </div>
 
       {/* Calculation Mode */}
@@ -121,13 +123,19 @@ export default function Calculator() {
       {/* Input Field */}
       <div className="space-y-1.5">
         <label className="text-xs font-bold text-foreground">
-          {mode === 'weightToValue' ? `Weight (${unit.toUpperCase()})` : 'Amount (PKR)'}
+          {mode === 'weightToValue' 
+            ? `Weight (${unit.toUpperCase()})` 
+            : `Amount (${currency === 'USD' ? 'USD $' : 'PKR Rs'})`}
         </label>
         <input
           type="number"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder={mode === 'weightToValue' ? 'Enter weight' : 'Enter amount in PKR'}
+          placeholder={
+            mode === 'weightToValue' 
+              ? 'Enter weight' 
+              : `Enter amount in ${currency === 'USD' ? 'USD' : 'PKR'}`
+          }
           className="w-full p-3 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
         />
       </div>
@@ -136,11 +144,20 @@ export default function Calculator() {
       {inputValue && (
         <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/20 to-amber-500/10 border border-amber-500/30 text-center space-y-1">
           <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Estimated Total</p>
-          <p className="text-2xl font-black text-foreground">
-            {mode === 'weightToValue'
-              ? `Rs ${formatPKR(Math.round(result))}`
-              : `${result.toFixed(4)} ${unit.toUpperCase()}`}
-          </p>
+          <div className="text-2xl font-black text-foreground">
+            {mode === 'weightToValue' ? (
+              <>
+                <p>{formatCurrency(result, currency)}</p>
+                {getUsdSubtext(result, currency) && (
+                  <p className="text-xs font-medium text-muted-foreground mt-0.5">
+                    {getUsdSubtext(result, currency)}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p>{result.toFixed(4)} {unit.toUpperCase()}</p>
+            )}
+          </div>
         </div>
       )}
     </div>
