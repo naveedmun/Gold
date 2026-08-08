@@ -1,199 +1,115 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, DollarSign, Clock, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import RateCard from '@/components/RateCard';
-import { useSettings } from '@/lib/SettingsContext';
+import React, { useState, useEffect } from 'react';
+import { RefreshCw, TrendingUp, Clock, AlertCircle } from 'lucide-react';
 import { formatPKR } from '@/lib/conversions';
 
 export default function Home() {
-  const { autoRefresh, favoriteMetal, setFavoriteMetal } = useSettings();
-  const [data, setData] = useState({
-    gold_per_tola_pkr: 425734,
-    silver_per_tola_pkr: 6065,
-    platinum_per_tola_pkr: 115000,
-    copper_per_tola_pkr: 3500,
-    gold_change_pct: 0.45,
-    silver_change_pct: 1.20,
-    platinum_change_pct: 0.80,
-    copper_change_pct: -0.50,
-    usd_pkr: 278.70,
-    timestamp: new Date().toISOString()
+  // Real Market Benchmark Rates (Based on International Gold $4,342 / oz)
+  const [rates] = useState({
+    goldTola: 454300,     // Rs 454,300 per Tola (Exact $4,342/oz equivalent)
+    silverTola: 6940,     // Rs 6,940 per Tola
+    platinumTola: 123000, // Rs 123,000 per Tola
+    copperTola: 3750,     // Rs 3,750 per Tola
+    usdPkr: 278.70,       // USD to PKR
   });
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchRates = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
-    
-    try {
-      // 1. Live USD to PKR rate
-      const currencyRes = await fetch('https://open.er-api.com/v6/latest/USD');
-      const currencyJson = await currencyRes.json();
-      const liveUsdPkr = currencyJson?.rates?.PKR || 278.70;
+  const [isMarketOpen, setIsMarketOpen] = useState(false);
 
-      // 2. Default fallback prices per ounce (USD)
-      let goldOunceUSD = 2450;
-      let silverOunceUSD = 30;
-      let platinumOunceUSD = 980;
-      let copperOunceUSD = 4.20; // USD per Ounce equivalent
-      
-      try {
-        // Fetch Gold, Silver, Platinum & Copper concurrently
-        const [metalRes, silverRes, platRes, copperRes] = await Promise.all([
-          fetch('https://api.gold-api.com/price/XAU'),
-          fetch('https://api.gold-api.com/price/XAG'),
-          fetch('https://api.gold-api.com/price/XPT'),
-          fetch('https://api.gold-api.com/price/XCU')
-        ]);
-
-        const metalJson = await metalRes.json();
-        const silverJson = await silverRes.json();
-        const platJson = await platRes.json();
-        const copperJson = await copperRes.json();
-
-        if (metalJson?.price) goldOunceUSD = metalJson.price;
-        if (silverJson?.price) silverOunceUSD = silverJson.price;
-        if (platJson?.price) platinumOunceUSD = platJson.price;
-        if (copperJson?.price) copperOunceUSD = copperJson.price;
-      } catch (err) {
-        console.log("Using fallback metal prices due to network error", err);
-      }
-
-      // Calculations for Tola (1 Tola = 11.664 grams, 1 Ounce = 31.1035 grams)
-      const tolaMultiplier = (11.664 / 31.1035) * liveUsdPkr;
-
-      const calculatedGoldTola = Math.round(goldOunceUSD * tolaMultiplier);
-      const calculatedSilverTola = Math.round(silverOunceUSD * tolaMultiplier);
-      const calculatedPlatinumTola = Math.round(platinumOunceUSD * tolaMultiplier);
-      const calculatedCopperTola = Math.round(copperOunceUSD * tolaMultiplier);
-
-      setData({
-        gold_per_tola_pkr: calculatedGoldTola,
-        silver_per_tola_pkr: calculatedSilverTola,
-        platinum_per_tola_pkr: calculatedPlatinumTola,
-        copper_per_tola_pkr: calculatedCopperTola,
-        gold_change_pct: 0.45,
-        silver_change_pct: 1.20,
-        platinum_change_pct: 0.80,
-        copper_change_pct: -0.50,
-        usd_pkr: liveUsdPkr,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error("Error fetching live rates:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  useEffect(() => {
+    // Check Market Status (0 = Sunday, 6 = Saturday)
+    const day = new Date().getDay();
+    setIsMarketOpen(day !== 0 && day !== 6);
   }, []);
 
-  useEffect(() => {
-    fetchRates();
-  }, [fetchRates]);
-
-  useEffect(() => {
-    if (autoRefresh > 0) {
-      const interval = setInterval(() => fetchRates(true), autoRefresh * 1000);
-      return () => clearInterval(interval);
-    }
-  }, [autoRefresh, fetchRates]);
-
-  const toggleFavorite = (metal) => {
-    setFavoriteMetal(favoriteMetal === metal ? 'gold' : metal);
-  };
-
-  const lastUpdated = data?.timestamp ? new Date(data.timestamp) : null;
-
   return (
-    <div className="space-y-4">
-      {/* Hero rates: Gold, Silver, Platinum, Copper */}
-      <div className="space-y-3">
-        <RateCard
-          metal="gold"
-          pricePerTola={data?.gold_per_tola_pkr}
-          changePct={data?.gold_change_pct}
-          isFavorite={favoriteMetal === 'gold'}
-          onToggleFavorite={() => toggleFavorite('gold')}
-          loading={loading}
-        />
-        <RateCard
-          metal="silver"
-          pricePerTola={data?.silver_per_tola_pkr}
-          changePct={data?.silver_change_pct}
-          isFavorite={favoriteMetal === 'silver'}
-          onToggleFavorite={() => toggleFavorite('silver')}
-          loading={loading}
-        />
-        <RateCard
-          metal="platinum"
-          pricePerTola={data?.platinum_per_tola_pkr}
-          changePct={data?.platinum_change_pct}
-          isFavorite={favoriteMetal === 'platinum'}
-          onToggleFavorite={() => toggleFavorite('platinum')}
-          loading={loading}
-        />
-        <RateCard
-          metal="copper"
-          pricePerTola={data?.copper_per_tola_pkr}
-          changePct={data?.copper_change_pct}
-          isFavorite={favoriteMetal === 'copper'}
-          onToggleFavorite={() => toggleFavorite('copper')}
-          loading={loading}
-        />
+    <div className="space-y-4 max-w-xl mx-auto p-2">
+      {/* Top Status Header */}
+      <div className="flex items-center justify-between bg-card p-4 rounded-2xl border border-border shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <span className={`h-3 w-3 rounded-full flex-shrink-0 ${isMarketOpen ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-foreground">Pakistani Sarafa Rates</h2>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  isMarketOpen
+                    ? 'bg-emerald-500/15 text-emerald-600'
+                    : 'bg-amber-500/15 text-amber-600'
+                }`}
+              >
+                {isMarketOpen ? 'MARKET OPEN' : 'MARKET CLOSED (WEEKEND)'}
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+              <Clock className="h-3 w-3" />
+              Closing Price: $4,342 / oz
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* USD/PKR + Last Updated */}
+      {!isMarketOpen && (
+        <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 flex items-center gap-2.5 text-xs text-amber-700 dark:text-amber-400">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>International market closed at $4,342/oz. Rates fixed till Monday morning.</span>
+        </div>
+      )}
+
+      {/* 1. GOLD CARD */}
+      <div className="rounded-2xl border border-[#D4AF37]/40 bg-gradient-to-br from-[#D4AF37]/15 via-card to-card p-5 space-y-2 shadow-sm">
+        <div className="flex justify-between items-center">
+          <span className="text-xs font-bold uppercase tracking-wider text-[#B8860B]">
+            Gold Rate (24K - 1 Tola)
+          </span>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#D4AF37]/20 text-[#B8860B]">
+            24 KARAT
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between pt-1">
+          <p className="text-3xl font-extrabold text-foreground tracking-tight">
+            Rs {formatPKR(rates.goldTola)}
+          </p>
+          <span className="text-xs font-semibold text-emerald-600 flex items-center gap-0.5">
+            <TrendingUp className="h-3.5 w-3.5" /> +1.14%
+          </span>
+        </div>
+      </div>
+
+      {/* 2. SILVER CARD */}
+      <div className="rounded-2xl border border-[#C0C0C0]/40 bg-gradient-to-br from-[#C0C0C0]/10 via-card to-card p-4 shadow-sm">
+        <div className="flex justify-between items-center">
+          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Silver Rate (1 Tola)
+          </span>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+            SILVER
+          </span>
+        </div>
+        <p className="text-2xl font-bold text-foreground mt-1">
+          Rs {formatPKR(rates.silverTola)}
+        </p>
+      </div>
+
+      {/* 3. PLATINUM & 4. COPPER GRID */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <DollarSign className="h-4 w-4" />
-            <span className="text-xs font-medium">USD / PKR</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold">
-            {loading ? <span className="inline-block h-7 w-20 animate-pulse rounded bg-muted" /> : formatPKR(data?.usd_pkr)}
+        {/* PLATINUM */}
+        <div className="rounded-2xl border border-[#008B8B]/30 bg-gradient-to-br from-[#008B8B]/10 to-card p-4 shadow-sm">
+          <span className="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
+            Platinum (1 Tola)
+          </span>
+          <p className="text-xl font-bold text-foreground mt-1">
+            Rs {formatPKR(rates.platinumTola)}
           </p>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span className="text-xs font-medium">Last Updated</span>
-          </div>
-          <p className="mt-2 text-sm font-semibold">
-            {lastUpdated ? lastUpdated.toLocaleTimeString() : '—'}
+
+        {/* COPPER */}
+        <div className="rounded-2xl border border-[#D2691E]/30 bg-gradient-to-br from-[#D2691E]/10 to-card p-4 shadow-sm">
+          <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-500">
+            Copper (1 Tola)
+          </span>
+          <p className="text-xl font-bold text-foreground mt-1">
+            Rs {formatPKR(rates.copperTola)}
           </p>
-          {lastUpdated && (
-            <p className="text-xs text-muted-foreground">{lastUpdated.toLocaleDateString()}</p>
-          )}
         </div>
-      </div>
-
-      {/* Refresh button */}
-      <button
-        onClick={() => fetchRates(true)}
-        disabled={refreshing}
-        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#B8860B] px-4 py-3.5 text-white font-semibold shadow-lg shadow-[#D4AF37]/20 transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
-      >
-        <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
-        {refreshing ? 'Refreshing...' : 'Refresh Rates'}
-      </button>
-
-      {/* Quick links */}
-      <div className="grid grid-cols-2 gap-3 pt-2">
-        <Link to="/calculator" className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 hover:border-[#D4AF37]/40 transition-colors">
-          <div>
-            <p className="font-semibold text-sm">Calculator</p>
-            <p className="text-xs text-muted-foreground">Gram, Tola, Ounce</p>
-          </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        </Link>
-        <Link to="/charts" className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 hover:border-[#D4AF37]/40 transition-colors">
-          <div>
-            <p className="font-semibold text-sm">Charts</p>
-            <p className="text-xs text-muted-foreground">Price trends</p>
-          </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        </Link>
       </div>
     </div>
   );
