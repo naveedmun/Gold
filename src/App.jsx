@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react'; // 👈 1. Analytics import kar liya
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -66,6 +67,7 @@ function App() {
           <AuthenticatedApp />
         </Router>
         <Toaster />
+        <Analytics /> {/* 👈 2. Yahan layout ke saath add kar diya */}
       </QueryClientProvider>
     </AuthProvider>
   );
