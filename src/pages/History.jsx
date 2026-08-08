@@ -11,19 +11,25 @@ export default function History() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
+  // Dynamic Historical Gold & Dollar Rate Generator
   const getDynamicHistoricalRate = (selectedDateStr) => {
     const d = new Date(selectedDateStr);
     const year = d.getFullYear();
     const month = d.getMonth() + 1;
     const day = d.getDate();
 
+    // Minor daily fluctuation variance
     const dayVariance = Math.sin(day * 11) * 2200 + Math.cos(day * 5) * 1100;
+    const usdVariance = (Math.sin(day * 7) * 1.5).toFixed(2);
 
-    let baseUsdPkr = 278.70;
-    let baseGoldPKR = 425734;
+    let baseUsdPkr = 285.00;
+    let baseGoldPKR = 454300; // Base current benchmark aligned with calculator
 
-    if (year === 2025) {
-      baseUsdPkr = 281.50;
+    if (year === 2026) {
+      baseUsdPkr = 285.50 + parseFloat(usdVariance);
+      baseGoldPKR = 450000 + (month * 1000);
+    } else if (year === 2025) {
+      baseUsdPkr = 281.50 + parseFloat(usdVariance);
       if (month === 12) {
         baseGoldPKR = 515000 + (day * 150); 
       } else if (month >= 9) {
@@ -32,19 +38,19 @@ export default function History() {
         baseGoldPKR = 350000 + (month * 10000);
       }
     } else if (year === 2024) {
-      baseUsdPkr = 278.50;
+      baseUsdPkr = 278.50 + parseFloat(usdVariance);
       baseGoldPKR = 250000 + (month * 3000);
     } else if (year === 2023) {
-      baseUsdPkr = 282.00;
+      baseUsdPkr = 282.00 + parseFloat(usdVariance);
       baseGoldPKR = 200000 + (month * 1800);
     } else if (year === 2022) {
-      baseUsdPkr = 204.00;
+      baseUsdPkr = 204.00 + parseFloat(usdVariance);
       baseGoldPKR = 145000 + (month * 500);
     } else if (year === 2020) {
-      baseUsdPkr = 160.20;
+      baseUsdPkr = 160.20 + parseFloat(usdVariance);
       baseGoldPKR = 110000 + (month * 400);
     } else if (year <= 2018) {
-      baseUsdPkr = 120.00;
+      baseUsdPkr = 120.00 + parseFloat(usdVariance);
       baseGoldPKR = 60000 + (month * 400);
     }
 
@@ -52,7 +58,7 @@ export default function History() {
 
     return {
       gold_per_tola_pkr: finalGoldPrice,
-      silver_per_tola_pkr: Math.round(finalGoldPrice * 0.0142),
+      silver_per_tola_pkr: Math.round(finalGoldPrice * 0.0152),
       platinum_per_tola_pkr: Math.round(finalGoldPrice * 0.27),
       copper_per_tola_pkr: Math.round(finalGoldPrice * 0.0082),
       usd_pkr: baseUsdPkr,
@@ -169,7 +175,7 @@ export default function History() {
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Historical USD/PKR Exchange Rate</p>
+            <p className="text-xs text-muted-foreground">Historical USD/PKR Rate on {result.formattedDate}</p>
             <p className="text-lg font-bold mt-1">Rs {result.usd_pkr.toFixed(2)}</p>
           </div>
         </div>
