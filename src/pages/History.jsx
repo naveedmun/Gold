@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { Calendar, Loader2, Search } from 'lucide-react';
-import { formatPKR } from '@/lib/conversions';
+import { formatCurrency, getUsdSubtext } from '@/lib/conversions';
 
 export default function History() {
+  const { currency = 'PKR' } = useOutletContext() || {};
   const today = new Date().toISOString().split('T')[0];
   const [date, setDate] = useState(today);
   const [result, setResult] = useState(null);
@@ -15,7 +17,6 @@ export default function History() {
     const month = d.getMonth() + 1;
     const day = d.getDate();
 
-    // Minor daily fluctuation offset
     const dayVariance = Math.sin(day * 11) * 2200 + Math.cos(day * 5) * 1100;
 
     let baseUsdPkr = 278.70;
@@ -24,7 +25,6 @@ export default function History() {
     if (year === 2025) {
       baseUsdPkr = 281.50;
       if (month === 12) {
-        // Aligned with 2025 High Peak (~520,000)
         baseGoldPKR = 515000 + (day * 150); 
       } else if (month >= 9) {
         baseGoldPKR = 480000 + (month * 2000);
@@ -77,7 +77,7 @@ export default function History() {
   };
 
   return (
-    <div className="space-y-4 max-w-xl mx-auto">
+    <div className="space-y-4 max-w-xl mx-auto p-2 pb-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Rate History Archives</h1>
         <p className="text-sm text-muted-foreground">Select any date from 2016 to 2026</p>
@@ -108,37 +108,69 @@ export default function History() {
 
       {searched && !loading && result && (
         <div className="space-y-3 pt-2">
+          {/* Gold Card */}
           <div className="rounded-2xl border border-[#D4AF37]/30 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Gold per Tola ({result.formattedDate})
             </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">Rs {formatPKR(result.gold_per_tola_pkr)}</p>
+            <p className="text-2xl font-bold mt-1 text-foreground">
+              {formatCurrency(result.gold_per_tola_pkr, currency, result.usd_pkr)}
+            </p>
+            {getUsdSubtext(result.gold_per_tola_pkr, currency, result.usd_pkr) && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {getUsdSubtext(result.gold_per_tola_pkr, currency, result.usd_pkr)}
+              </p>
+            )}
           </div>
 
+          {/* Silver Card */}
           <div className="rounded-2xl border border-[#C0C0C0]/30 bg-gradient-to-br from-[#C0C0C0]/10 to-transparent p-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Silver per Tola ({result.formattedDate})
             </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">Rs {formatPKR(result.silver_per_tola_pkr)}</p>
+            <p className="text-2xl font-bold mt-1 text-foreground">
+              {formatCurrency(result.silver_per_tola_pkr, currency, result.usd_pkr)}
+            </p>
+            {getUsdSubtext(result.silver_per_tola_pkr, currency, result.usd_pkr) && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {getUsdSubtext(result.silver_per_tola_pkr, currency, result.usd_pkr)}
+              </p>
+            )}
           </div>
 
+          {/* Platinum Card */}
           <div className="rounded-2xl border border-[#008B8B]/30 bg-gradient-to-br from-[#008B8B]/10 to-transparent p-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Platinum per Tola ({result.formattedDate})
             </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">Rs {formatPKR(result.platinum_per_tola_pkr)}</p>
+            <p className="text-2xl font-bold mt-1 text-foreground">
+              {formatCurrency(result.platinum_per_tola_pkr, currency, result.usd_pkr)}
+            </p>
+            {getUsdSubtext(result.platinum_per_tola_pkr, currency, result.usd_pkr) && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {getUsdSubtext(result.platinum_per_tola_pkr, currency, result.usd_pkr)}
+              </p>
+            )}
           </div>
 
+          {/* Copper Card */}
           <div className="rounded-2xl border border-[#D2691E]/30 bg-gradient-to-br from-[#D2691E]/10 to-transparent p-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Copper per Tola ({result.formattedDate})
             </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">Rs {formatPKR(result.copper_per_tola_pkr)}</p>
+            <p className="text-2xl font-bold mt-1 text-foreground">
+              {formatCurrency(result.copper_per_tola_pkr, currency, result.usd_pkr)}
+            </p>
+            {getUsdSubtext(result.copper_per_tola_pkr, currency, result.usd_pkr) && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {getUsdSubtext(result.copper_per_tola_pkr, currency, result.usd_pkr)}
+              </p>
+            )}
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Historical USD/PKR Rate</p>
-            <p className="text-lg font-bold mt-1">Rs {formatPKR(result.usd_pkr)}</p>
+            <p className="text-xs text-muted-foreground">Historical USD/PKR Exchange Rate</p>
+            <p className="text-lg font-bold mt-1">Rs {result.usd_pkr.toFixed(2)}</p>
           </div>
         </div>
       )}
