@@ -11,23 +11,44 @@ export default function History() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
-  // Dynamic Historical Gold & Dollar Rate Generator
+  // Exact Current Home Page Benchmarks
+  const CURRENT_HOME_RATES = {
+    gold: 454300,
+    silver: 6940,
+    platinum: 123000,
+    copper: 3750,
+    usdPkr: 278.70
+  };
+
   const getDynamicHistoricalRate = (selectedDateStr) => {
     const d = new Date(selectedDateStr);
+
+    // 1. Agar AAJ ki date select ki hai, toh exact Home Page wale rates do
+    if (selectedDateStr === today) {
+      return {
+        gold_per_tola_pkr: CURRENT_HOME_RATES.gold,
+        silver_per_tola_pkr: CURRENT_HOME_RATES.silver,
+        platinum_per_tola_pkr: CURRENT_HOME_RATES.platinum,
+        copper_per_tola_pkr: CURRENT_HOME_RATES.copper,
+        usd_pkr: CURRENT_HOME_RATES.usdPkr,
+        formattedDate: d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+      };
+    }
+
+    // 2. Agar PURANI date select ki hai, toh past dynamic rates generate karo
     const year = d.getFullYear();
     const month = d.getMonth() + 1;
     const day = d.getDate();
 
-    // Minor daily fluctuation variance
     const dayVariance = Math.sin(day * 11) * 2200 + Math.cos(day * 5) * 1100;
     const usdVariance = (Math.sin(day * 7) * 1.5).toFixed(2);
 
-    let baseUsdPkr = 285.00;
-    let baseGoldPKR = 454300; // Base current benchmark aligned with calculator
+    let baseUsdPkr = 278.70;
+    let baseGoldPKR = 454300;
 
     if (year === 2026) {
-      baseUsdPkr = 285.50 + parseFloat(usdVariance);
-      baseGoldPKR = 450000 + (month * 1000);
+      baseUsdPkr = 278.70 + parseFloat(usdVariance);
+      baseGoldPKR = 450000 + (month * 500);
     } else if (year === 2025) {
       baseUsdPkr = 281.50 + parseFloat(usdVariance);
       if (month === 12) {
