@@ -4,7 +4,7 @@ import { Home, LineChart, History, Calculator, Bell, Settings, X, Moon, Sun, Coi
 
 export default function Layout() {
   const [currency, setCurrency] = useState('PKR'); // 'PKR' | 'USD'
-  const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
+  const [theme, setTheme] = useState('light'); // Default now set to 'light'
   const [defaultMetal, setDefaultMetal] = useState('gold'); // 'gold' | 'silver'
   const [defaultUnit, setDefaultUnit] = useState('tola'); // 'tola' | 'gram' | '10gram' | 'ounce'
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -133,20 +133,20 @@ export default function Layout() {
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => setTheme('dark')}
-                  className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
-                    theme === 'dark' ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border bg-muted/30 text-foreground'
-                  }`}
-                >
-                  <Moon className="w-4 h-4" /> Dark Mode
-                </button>
-                <button
                   onClick={() => setTheme('light')}
                   className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
                     theme === 'light' ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border bg-muted/30 text-foreground'
                   }`}
                 >
                   <Sun className="w-4 h-4" /> Light Mode
+                </button>
+                <button
+                  onClick={() => setTheme('dark')}
+                  className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                    theme === 'dark' ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border bg-muted/30 text-foreground'
+                  }`}
+                >
+                  <Moon className="w-4 h-4" /> Dark Mode
                 </button>
               </div>
             </div>
