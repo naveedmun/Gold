@@ -1,63 +1,61 @@
 import React from 'react';
-import { Outlet, NavLink, Link } from 'react-router-dom';
-import { Home as HomeIcon, LineChart, Calendar, Calculator, Bell, Settings as SettingsIcon } from 'lucide-react';
-import { SettingsProvider } from '@/lib/SettingsContext';
-
-const navItems = [
-  { to: '/', icon: HomeIcon, label: 'Home' },
-  { to: '/charts', icon: LineChart, label: 'Charts' },
-  { to: '/history', icon: Calendar, label: 'History' },
-  { to: '/calculator', icon: Calculator, label: 'Calc' },
-  { to: '/alerts', icon: Bell, label: 'Alerts' },
-];
+import { Outlet, NavLink } from 'react-router-dom';
+import { Home, LineChart, History, Calculator, Bell, Settings } from 'lucide-react';
 
 export default function Layout() {
   return (
-    <SettingsProvider>
-      <div className="min-h-screen bg-background text-foreground flex flex-col">
-        {/* Header */}
-        <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-lg">
-          <div className="mx-auto max-w-2xl flex items-center justify-between px-4 py-3">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#B8860B] shadow-sm">
-                <span className="text-white font-bold text-sm">G</span>
-              </div>
-              <span className="font-heading font-bold text-lg tracking-tight">
-                GoldRate<span className="text-[#D4AF37]">PK</span>
-              </span>
-            </Link>
-            <Link to="/settings" className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent transition-colors">
-              <SettingsIcon className="h-5 w-5" />
-            </Link>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* Top App Header */}
+      <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-lg bg-amber-500 flex items-center justify-center font-black text-black text-xs">
+            G
           </div>
-        </header>
+          <h1 className="font-black text-base tracking-tight">GoldRate<span className="text-amber-500">PK</span></h1>
+        </div>
+        <button className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted">
+          <Settings className="h-5 w-5" />
+        </button>
+      </header>
 
-        {/* Content */}
-        <main className="flex-1 mx-auto w-full max-w-2xl px-4 py-4 pb-24">
-          <Outlet />
-        </main>
+      {/* Main Screen Content */}
+      <main className="flex-1 pb-24">
+        <Outlet />
+      </main>
 
-        {/* Bottom Nav */}
-        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-lg">
-          <div className="mx-auto max-w-2xl flex items-center justify-around px-2 py-2">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/'}
-                className={({ isActive }) =>
-                  `flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors ${
-                    isActive ? 'text-[#D4AF37]' : 'text-muted-foreground'
-                  }`
-                }
-              >
-                <item.icon className="h-5 w-5" />
-                <span className="text-[10px] font-medium">{item.label}</span>
-              </NavLink>
-            ))}
-          </div>
+      {/* Fixed Bottom Container (Branding + Navigation) */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t border-border">
+        {/* BRANDING STRIP (Har Screen Ke Footer Par Dikhaye Gi) */}
+        <div className="py-1 bg-amber-500/10 border-b border-amber-500/20 text-center">
+          <p className="text-[10px] text-muted-foreground font-medium">
+            Developed by <span className="font-extrabold text-amber-600 dark:text-amber-400 tracking-wider">MUN DEVELOPERS</span>
+          </p>
+        </div>
+
+        {/* Bottom Navigation Bar */}
+        <nav className="max-w-md mx-auto flex justify-around py-2">
+          <NavLink to="/" className={({ isActive }) => `flex flex-col items-center gap-1 text-[10px] font-medium ${isActive ? 'text-amber-500' : 'text-muted-foreground'}`}>
+            <Home className="h-4 w-4" />
+            Home
+          </NavLink>
+          <NavLink to="/charts" className={({ isActive }) => `flex flex-col items-center gap-1 text-[10px] font-medium ${isActive ? 'text-amber-500' : 'text-muted-foreground'}`}>
+            <LineChart className="h-4 w-4" />
+            Charts
+          </NavLink>
+          <NavLink to="/history" className={({ isActive }) => `flex flex-col items-center gap-1 text-[10px] font-medium ${isActive ? 'text-amber-500' : 'text-muted-foreground'}`}>
+            <History className="h-4 w-4" />
+            History
+          </NavLink>
+          <NavLink to="/calc" className={({ isActive }) => `flex flex-col items-center gap-1 text-[10px] font-medium ${isActive ? 'text-amber-500' : 'text-muted-foreground'}`}>
+            <Calculator className="h-4 w-4" />
+            Calc
+          </NavLink>
+          <NavLink to="/alerts" className={({ isActive }) => `flex flex-col items-center gap-1 text-[10px] font-medium ${isActive ? 'text-amber-500' : 'text-muted-foreground'}`}>
+            <Bell className="h-4 w-4" />
+            Alerts
+          </NavLink>
         </nav>
       </div>
-    </SettingsProvider>
+    </div>
   );
 }
