@@ -3,15 +3,19 @@ export const GRAMS_PER_TOLA = 11.6638;
 export const GRAMS_PER_TROY_OUNCE = 31.1035;
 export const TOLAS_PER_TROY_OUNCE = GRAMS_PER_TROY_OUNCE / GRAMS_PER_TOLA; // ~2.6667
 
-// Today's benchmark rates in PKR per Tola & Exchange Rate
+// Benchmark rates in PKR per Tola & Exchange Rate
 export const LATEST_RATES = {
-  gold: 424350,  // Gold Tola Rate (PKR)
-  silver: 6940,  // Silver Tola Rate (PKR)
-  usdPkr: 278.5  // 1 USD = 278.5 PKR (approx)
+  gold: 454300,      // Gold Tola Rate (PKR)
+  silver: 6940,      // Silver Tola Rate (PKR)
+  platinum: 123000,  // Platinum Tola Rate (PKR)
+  copper: 3750,      // Copper Tola Rate (PKR)
+  usdPkr: 278.70     // 1 USD = 278.70 PKR
 };
 
 // Convert from per-tola price to other units
-export function convertFromTola(perTolaPrice, unit) {
+export function convertFromTola(perTolaPrice, unit = 'tola') {
+  if (!perTolaPrice || isNaN(perTolaPrice)) return 0;
+
   switch (unit) {
     case 'gram':
       return perTolaPrice / GRAMS_PER_TOLA;
@@ -27,7 +31,7 @@ export function convertFromTola(perTolaPrice, unit) {
   }
 }
 
-// Formatting Numbers & PKR
+// Formatting Numbers
 export function formatPKR(amount) {
   if (amount == null || isNaN(amount)) return '—';
   return new Intl.NumberFormat('en-PK', {
@@ -44,12 +48,17 @@ export function formatNumber(amount, decimals = 2) {
   }).format(amount);
 }
 
-// Currency Switcher Formatter (Supports PKR & USD)
-export function formatCurrency(amountInPKR, currency = 'PKR') {
+/**
+ * Universal Formatter for PKR & USD
+ * @param {number} amountInPKR - Base price in PKR
+ * @param {string} currency - 'PKR' or 'USD'
+ * @param {number} customUsdRate - Optional override for exchange rate
+ */
+export function formatCurrency(amountInPKR, currency = 'PKR', customUsdRate = LATEST_RATES.usdPkr) {
   if (amountInPKR == null || isNaN(amountInPKR)) return '—';
 
   if (currency === 'USD') {
-    const amountInUSD = amountInPKR / LATEST_RATES.usdPkr;
+    const amountInUSD = amountInPKR / customUsdRate;
     return `$ ${amountInUSD.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
@@ -57,6 +66,20 @@ export function formatCurrency(amountInPKR, currency = 'PKR') {
   }
 
   return `Rs ${formatPKR(amountInPKR)}`;
+}
+
+/**
+ * Generates USD subtext like "(~ $1,629.99 USD)" when PKR is selected
+ */
+export function getUsdSubtext(amountInPKR, currency = 'PKR', customUsdRate = LATEST_RATES.usdPkr) {
+  if (currency === 'PKR' && amountInPKR && !isNaN(amountInPKR)) {
+    const usdAmount = (amountInPKR / customUsdRate).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    return `(~ $${usdAmount} USD)`;
+  }
+  return null;
 }
 
 export const UNITS = [
