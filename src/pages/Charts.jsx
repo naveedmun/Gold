@@ -8,8 +8,10 @@ export default function Charts() {
   const [selectedMetal, setSelectedMetal] = useState('gold');
   const [timeframe, setTimeframe] = useState('10Y');
   const [chartType, setChartType] = useState('line');
+  
+  // Hover State for Tooltip
+  const [hoveredPoint, setHoveredPoint] = useState(null);
 
-  // USD Rate benchmark
   const USD_RATE = LATEST_RATES?.usdPkr || 278.70;
 
   const getHistoricalData = () => {
@@ -74,7 +76,6 @@ export default function Charts() {
   const endPrice = prices[prices.length - 1];
   const changePct = (((endPrice - startPrice) / startPrice) * 100).toFixed(1);
 
-  // Helper to format short labels for graph axes (e.g., $1.6k or 454k)
   const formatShortValue = (pkrAmount) => {
     if (currency === 'USD') {
       const usdVal = pkrAmount / USD_RATE;
@@ -83,15 +84,20 @@ export default function Charts() {
     return pkrAmount >= 100000 ? `${(pkrAmount / 1000).toFixed(0)}k` : pkrAmount;
   };
 
-  const generateSvgPath = () => {
+  // Generate SVG Points with Coordinates for Hover Detection
+  const getPoints = () => {
     const width = 100;
     const height = 100;
-    const points = currentData.map((item, index) => {
+    return currentData.map((item, index) => {
       const x = (index / (currentData.length - 1)) * width;
-      const y = height - ((item.price - minPrice) / (maxPrice - minPrice || 1)) * 80 - 10;
-      return { x, y };
+      const y = height - ((item.price - minPrice) / (maxPrice - minPrice || 1)) * 70 - 15;
+      return { x, y, ...item };
     });
+  };
 
+  const points = getPoints();
+
+  const generateSvgPath = () => {
     return points.reduce((acc, pt, i, arr) => {
       if (i === 0) return `M ${pt.x},${pt.y}`;
       const prev = arr[i - 1];
@@ -153,7 +159,10 @@ export default function Charts() {
         {['1D', '1W', '1M', '1Y', '5Y', '10Y'].map((tf) => (
           <button
             key={tf}
-            onClick={() => setTimeframe(tf)}
+            onClick={() => {
+              setTimeframe(tf);
+              setHoveredPoint(null);
+            }}
             className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
               timeframe === tf
                 ? 'bg-[#D4AF37] text-white shadow-sm'
@@ -165,23 +174,55 @@ export default function Charts() {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4 relative">
+        
+        {/* Active Tooltip Display */}
+        <div className="min-h-[32px] flex items-center justify-between border-b border-border/50 pb-2">
+          {hoveredPoint ? (
+            <div className="flex justify-between items-center w-full bg-muted/60 px-3 py-1.5 rounded-lg border border-[#D4AF37]/30 transition-all">
+              <span className="text-xs font-semibold text-muted-foreground">
+                Time: <strong className="text-foreground">{hoveredPoint.label}</strong>
+              </span>
+              <span className="text-sm font-black text-[#D4AF37]">
+                {formatCurrency(hoveredPoint.price, currency, USD_RATE)}
+              </span>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic w-full text-center">
+              Hover / touch graph points to view detailed rate
+            </p>
+          )}
+        </div>
+
         {chartType === 'bar' ? (
-          <div className="h-56 flex items-end justify-between gap-3 pt-6 pb-2 px-2">
+          <div className="h-56 flex items-end justify-between gap-3 pt-4 pb-2 px-2">
             {currentData.map((item, idx) => {
               const heightPercent = Math.max(
                 15,
                 Math.round(((item.price - minPrice) / (maxPrice - minPrice || 1)) * 75 + 20)
               );
 
+              const isHovered = hoveredPoint?.label === item.label;
+
               return (
-                <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end gap-2">
-                  <span className="text-[10px] font-bold text-muted-foreground">
+                <div
+                  key={idx}
+                  onMouseEnter={() => setHoveredPoint(item)}
+                  onMouseLeave={() => setHoveredPoint(null)}
+                  className="flex-1 flex flex-col items-center h-full justify-end gap-2 cursor-pointer group"
+                >
+                  <span className={`text-[10px] font-bold transition-colors ${
+                    isHovered ? 'text-[#D4AF37]' : 'text-muted-foreground'
+                  }`}>
                     {formatShortValue(item.price)}
                   </span>
                   <div
                     style={{ height: `${heightPercent}%` }}
-                    className="w-full bg-gradient-to-t from-[#B8860B] to-[#D4AF37] rounded-t-md transition-all duration-300"
+                    className={`w-full rounded-t-md transition-all duration-300 ${
+                      isHovered
+                        ? 'bg-[#D4AF37] shadow-lg shadow-[#D4AF37]/30 scale-105'
+                        : 'bg-gradient-to-t from-[#B8860B] to-[#D4AF37] opacity-80 group-hover:opacity-100'
+                    }`}
                   />
                   <span className="text-[11px] text-muted-foreground font-semibold">{item.label}</span>
                 </div>
@@ -192,6 +233,7 @@ export default function Charts() {
           <div className="space-y-4">
             <div className="relative h-52 w-full pt-4">
               <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                {/* Background Line */}
                 <path
                   d={generateSvgPath()}
                   fill="none"
@@ -199,13 +241,55 @@ export default function Charts() {
                   strokeWidth="3"
                   vectorEffect="non-scaling-stroke"
                 />
+
+                {/* Interactive Points on Line */}
+                {points.map((pt, idx) => {
+                  const isHovered = hoveredPoint?.label === pt.label;
+                  return (
+                    <g key={idx}>
+                      {/* Active Highlight Ring */}
+                      {isHovered && (
+                        <circle
+                          cx={pt.x}
+                          cy={pt.y}
+                          r="5"
+                          fill="#D4AF37"
+                          fillOpacity="0.4"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      )}
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={isHovered ? "3" : "2"}
+                        fill={isHovered ? "#ffffff" : "#D4AF37"}
+                        stroke="#B8860B"
+                        strokeWidth="1.5"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                      {/* Big invisible touch target for easy hover / click */}
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r="12"
+                        fill="transparent"
+                        className="cursor-pointer"
+                        onMouseEnter={() => setHoveredPoint(pt)}
+                        onMouseLeave={() => setHoveredPoint(null)}
+                        onTouchStart={() => setHoveredPoint(pt)}
+                      />
+                    </g>
+                  );
+                })}
               </svg>
             </div>
             <div className="flex justify-between items-center px-1">
               {currentData.map((item, idx) => (
                 <div key={idx} className="text-center">
                   <p className="text-[11px] font-semibold text-muted-foreground">{item.label}</p>
-                  <p className="text-[10px] font-bold text-foreground">
+                  <p className={`text-[10px] font-bold ${
+                    hoveredPoint?.label === item.label ? 'text-[#D4AF37]' : 'text-foreground'
+                  }`}>
                     {formatShortValue(item.price)}
                   </p>
                 </div>
