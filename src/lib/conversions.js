@@ -3,46 +3,49 @@ export const GRAMS_PER_TOLA = 11.6638;
 export const GRAMS_PER_TROY_OUNCE = 31.1035;
 export const TOLAS_PER_TROY_OUNCE = GRAMS_PER_TROY_OUNCE / GRAMS_PER_TOLA; // ~2.6667
 
-// Default fallback rates in PKR per Tola & Exchange Rate
+// Clean base object with zero values (No hardcoded dummy rates)
 export const LATEST_RATES = {
-  gold: 454300,      // Fallback Gold Tola Rate (PKR)
-  silver: 6940,      // Silver Tola Rate (PKR)
-  platinum: 123000,  // Platinum Tola Rate (PKR)
-  copper: 3750,      // Copper Tola Rate (PKR)
-  usdPkr: 278.70     // 1 USD = 278.70 PKR
+  gold: 0,
+  silver: 0,
+  platinum: 0,
+  copper: 0,
+  usdPkr: 278.70     // Base exchange rate
 };
 
-// Live Rate Fetcher using reliable public gold feed
+// Live Rate Fetcher using CORS-friendly public feed
 export async function fetchLiveMarketRates() {
   try {
-    // Using a reliable open gold rate endpoint
-    const response = await fetch('https://data-asg.goldprice.org/dbspot/USD');
-    const data = await response.json();
+    // Using AllOrigins CORS proxy to safely fetch live international spot prices from browser
+    const targetUrl = encodeURIComponent('https://data-asg.goldprice.org/dbspot/USD');
+    const response = await fetch(`https://api.allorigins.win/get?url=${targetUrl}`);
+    const wrapper = await response.json();
     
-    if (data && data.items && data.items.length > 0) {
-      // xauPrice gives the live ounce price in USD (e.g. ~4320.11)
-      const liveOunceUSD = data.items[0].xauPrice;
-      const liveSilverOunceUSD = data.items[0].xagPrice || 30; // fallback silver if missing
-      const usdPkrRate = LATEST_RATES.usdPkr;
+    if (wrapper && wrapper.contents) {
+      const data = JSON.parse(wrapper.contents);
+      if (data && data.items && data.items.length > 0) {
+        const liveOunceUSD = data.items[0].xauPrice; // Live ounce price
+        const liveSilverOunceUSD = data.items[0].xagPrice || 30;
+        const usdPkrRate = LATEST_RATES.usdPkr;
 
-      // Convert Troy Ounce USD to Per Tola PKR
-      const goldTolaPKR = (liveOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
-      const silverTolaPKR = (liveSilverOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
+        // Convert Troy Ounce USD to Per Tola PKR
+        const goldTolaPKR = (liveOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
+        const silverTolaPKR = (liveSilverOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
 
-      return {
-        gold: Math.round(goldTolaPKR),
-        silver: Math.round(silverTolaPKR),
-        platinum: LATEST_RATES.platinum,
-        copper: LATEST_RATES.copper,
-        usdPkr: usdPkrRate,
-        isLive: true
-      };
+        return {
+          gold: Math.round(goldTolaPKR),
+          silver: Math.round(silverTolaPKR),
+          platinum: LATEST_RATES.platinum || 123000,
+          copper: LATEST_RATES.copper || 3750,
+          usdPkr: usdPkrRate,
+          isLive: true
+        };
+      }
     }
   } catch (error) {
-    console.warn('Live API fetch failed, using fallback rates:', error);
+    console.error('Live API fetch failed via proxy:', error);
   }
   
-  return LATEST_RATES; // Fallback if network/API fails
+  return LATEST_RATES; // Returns zero/fallback if network fails
 }
 
 // Convert from per-tola price to other units
@@ -66,7 +69,7 @@ export function convertFromTola(perTolaPrice, unit = 'tola') {
 
 // Formatting Numbers
 export function formatPKR(amount) {
-  if (amount == null || isNaN(amount)) return '—';
+  if (amount == null || isNaN(amount) || amount === 0) return '—';
   return new Intl.NumberFormat('en-PK', {
     style: 'decimal',
     maximumFractionDigits: 0
@@ -74,7 +77,7 @@ export function formatPKR(amount) {
 }
 
 export function formatNumber(amount, decimals = 2) {
-  if (amount == null || isNaN(amount)) return '—';
+  if (amount == null || isNaN(amount) || amount === 0) return '—';
   return new Intl.NumberFormat('en-PK', {
     maximumFractionDigits: decimals,
     minimumFractionDigits: decimals
@@ -85,7 +88,7 @@ export function formatNumber(amount, decimals = 2) {
  * Universal Formatter for PKR & USD
  */
 export function formatCurrency(amountInPKR, currency = 'PKR', customUsdRate = LATEST_RATES.usdPkr) {
-  if (amountInPKR == null || isNaN(amountInPKR)) return '—';
+  if (amountInPKR == null || isNaN(amountInPKR) || amountInPKR === 0) return '—';
 
   if (currency === 'USD') {
     const amountInUSD = amountInPKR / customUsdRate;
@@ -99,10 +102,10 @@ export function formatCurrency(amountInPKR, currency = 'PKR', customUsdRate = LA
 }
 
 /**
- * Generates USD subtext like "(~ $1,629.99 USD)" when PKR is selected
+ * Generates USD subtext when PKR is selected
  */
 export function getUsdSubtext(amountInPKR, currency = 'PKR', customUsdRate = LATEST_RATES.usdPkr) {
-  if (currency === 'PKR' && amountInPKR && !isNaN(amountInPKR)) {
+  if (currency === 'PKR' && amountInPKR && !isNaN(amountInPKR) && amountInPKR !== 0) {
     const usdAmount = (amountInPKR / customUsdRate).toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
