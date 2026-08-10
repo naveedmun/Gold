@@ -6,22 +6,55 @@ export default function Home() {
   // Read selected currency from Layout header context (Default: PKR)
   const { currency = 'PKR' } = useOutletContext() || {};
 
-  const [rates] = useState({
+  const [rates, setRates] = useState({
     goldTola: 454300,
     silverTola: 6940,
     platinumTola: 123000,
     copperTola: 3750,
-    usdPkr: 278.70, // USD Exchange Rate
+    usdPkr: 278.70,
   });
 
+  const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isMarketOpen, setIsMarketOpen] = useState(false);
 
+  // Check market timings (Open Monday to Friday)
   useEffect(() => {
     const day = new Date().getDay();
     setIsMarketOpen(day !== 0 && day !== 6);
   }, []);
 
-  // Helper for direct clean formatting without buggy lib dependencies
+  // Function to fetch or simulate latest live rates update
+  const fetchLatestRates = async () => {
+    setLoading(true);
+    try {
+      // Yahan aap apni backend API ya base44 function call integrate kar sakte hain
+      // Misal ke tor par simulated network request:
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      // Example update logic / live simulation adjustment
+      setRates((prev) => ({
+        ...prev,
+        goldTola: prev.goldTola + (Math.random() > 0.5 ? 200 : -150),
+        silverTola: prev.silverTola + (Math.random() > 0.5 ? 10 : -10),
+      }));
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error('Failed to update rates', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Auto-update rates interval (e.g., checks/updates every 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchLatestRates();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Helper for direct clean formatting
   const formatValue = (amountInPKR) => {
     if (currency === 'USD') {
       const usdAmount = amountInPKR / rates.usdPkr;
@@ -60,16 +93,26 @@ export default function Home() {
             </div>
             <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
               <Clock className="h-3 w-3" />
-              Closing Price: $4,342 / oz | USD/PKR: Rs {rates.usdPkr}
+              Updated: {lastUpdated.toLocaleTimeString()} | USD/PKR: Rs {rates.usdPkr}
             </p>
           </div>
         </div>
+
+        {/* Manual Refresh Button */}
+        <button
+          onClick={fetchLatestRates}
+          disabled={loading}
+          className="p-2 rounded-xl bg-card border border-border hover:bg-muted/50 transition-colors flex items-center justify-center"
+          title="Refresh Rates"
+        >
+          <RefreshCw className={`h-4 w-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {!isMarketOpen && (
         <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 flex items-center gap-2.5 text-xs text-amber-700 dark:text-amber-400">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span>International market closed at $4,342/oz. Rates fixed till Monday morning.</span>
+          <span>International market closed. Rates fixed till Monday morning.</span>
         </div>
       )}
 
