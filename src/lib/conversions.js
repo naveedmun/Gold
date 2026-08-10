@@ -3,14 +3,51 @@ export const GRAMS_PER_TOLA = 11.6638;
 export const GRAMS_PER_TROY_OUNCE = 31.1035;
 export const TOLAS_PER_TROY_OUNCE = GRAMS_PER_TROY_OUNCE / GRAMS_PER_TOLA; // ~2.6667
 
-// Benchmark rates in PKR per Tola & Exchange Rate
+// Default fallback rates in PKR per Tola & Exchange Rate
 export const LATEST_RATES = {
-  gold: 454300,      // Gold Tola Rate (PKR)
+  gold: 454300,      // Fallback Gold Tola Rate (PKR)
   silver: 6940,      // Silver Tola Rate (PKR)
   platinum: 123000,  // Platinum Tola Rate (PKR)
   copper: 3750,      // Copper Tola Rate (PKR)
   usdPkr: 278.70     // 1 USD = 278.70 PKR
 };
+
+// Live Rate Fetcher from Free Public / Global Financial Endpoints
+export async function fetchLiveMarketRates() {
+  try {
+    // Fetching live XAU (Gold) and XAG (Silver) rates against USD
+    const response = await fetch('https://api.metals.live/v1/spot');
+    const data = await response.json();
+    
+    // Find gold and silver from response array
+    const goldObj = data.find(item => item.gold);
+    const silverObj = data.find(item => item.silver);
+
+    if (goldObj && silverObj) {
+      const liveOunceUSD = goldObj.gold;
+      const liveSilverOunceUSD = silverObj.silver;
+      const usdPkrRate = LATEST_RATES.usdPkr;
+
+      // Convert Troy Ounce USD to Per Tola PKR
+      // Formula: (OunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate
+      const goldTolaPKR = (liveOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
+      const silverTolaPKR = (liveSilverOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
+
+      return {
+        gold: Math.round(goldTolaPKR),
+        silver: Math.round(silverTolaPKR),
+        platinum: LATEST_RATES.platinum,
+        copper: LATEST_RATES.copper,
+        usdPkr: usdPkrRate,
+        isLive: true
+      };
+    }
+  } catch (error) {
+    console.warn('Live API fetch failed, falling back to default rates:', error);
+  }
+  
+  return LATEST_RATES; // Fallback if network/API fails
+}
 
 // Convert from per-tola price to other units
 export function convertFromTola(perTolaPrice, unit = 'tola') {
@@ -50,9 +87,6 @@ export function formatNumber(amount, decimals = 2) {
 
 /**
  * Universal Formatter for PKR & USD
- * @param {number} amountInPKR - Base price in PKR
- * @param {string} currency - 'PKR' or 'USD'
- * @param {number} customUsdRate - Optional override for exchange rate
  */
 export function formatCurrency(amountInPKR, currency = 'PKR', customUsdRate = LATEST_RATES.usdPkr) {
   if (amountInPKR == null || isNaN(amountInPKR)) return '—';
