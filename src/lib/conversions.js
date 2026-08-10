@@ -1,15 +1,6 @@
 // src/lib/conversions.js
 
-const TROY_OUNCE_GRAMS = 31.1034768;
 const TOLA_GRAMS = 11.6638125;
-
-// 1 Tola in Troy Ounce
-const TOLA_IN_TROY_OUNCE = TOLA_GRAMS / TROY_OUNCE_GRAMS;
-
-// Metals.Dev API Key
-// Vite mein .env file ke andar:
-// VITE_METALS_API_KEY=YOUR_API_KEY
-const METALS_API_KEY = import.meta.env.VITE_METALS_API_KEY;
 
 // ---------------------------------------------------------
 // Helper: Safe number
@@ -20,201 +11,99 @@ function toNumber(value) {
 }
 
 // ---------------------------------------------------------
-// Fetch USD/PKR
+// Fetch LIVE market rates
 // ---------------------------------------------------------
-// open.er-api.com is used for currency conversion.
-// This is an FX/interbank reference rate and may not equal
-// Pakistan's open-market/Sarafa rate exactly.
-async function fetchUsdPkr() {
-  try {
-    const response = await fetch(
-      'https://open.er-api.com/v6/latest/USD',
-      {
-        cache: 'no-store',
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`USD/PKR API failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    const usdPkr = toNumber(data?.rates?.PKR);
-
-    if (!usdPkr) {
-      throw new Error('USD/PKR rate not found');
-    }
-
-    return usdPkr;
-  } catch (error) {
-    console.error('USD/PKR fetch error:', error);
-    throw error;
-  }
-}
-
-// ---------------------------------------------------------
-// Fetch live metal rates from Metals.Dev
-// ---------------------------------------------------------
-async function fetchMetalRates() {
-  if (!METALS_API_KEY) {
-    throw new Error(
-      'VITE_METALS_API_KEY is missing. Add it to your .env file.'
-    );
-  }
-
-  const url =
-    `https://api.metals.dev/v1/latest` +
-    `?api_key=${encodeURIComponent(METALS_API_KEY)}` +
-    `&currency=USD` +
-    `&unit=toz`;
-
-  const response = await fetch(url, {
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Metals.Dev API failed: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const data = await response.json();
-
-  if (data?.status !== 'success') {
-    throw new Error(
-      data?.error?.message ||
-      data?.message ||
-      'Metals.Dev returned an unsuccessful response'
-    );
-  }
-
-  return data;
-}
-
-// ---------------------------------------------------------
-// Convert USD per Troy Ounce -> PKR per Tola
-// ---------------------------------------------------------
-function usdPerTroyOunceToPkrPerTola(
-  usdPerTroyOunce,
-  usdPkr
-) {
-  const usdPerOunce = toNumber(usdPerTroyOunce);
-
-  if (!usdPerOunce || !usdPkr) {
-    return 0;
-  }
-
-  // Price per Troy Ounce × Tola fraction
-  const usdPerTola =
-    usdPerOunce * TOLA_IN_TROY_OUNCE;
-
-  // Convert USD -> PKR
-  return usdPerTola * usdPkr;
-}
-
-// ---------------------------------------------------------
-// Convert USD per Troy Ounce -> USD per Tola
-// ---------------------------------------------------------
-function usdPerTroyOunceToUsdPerTola(
-  usdPerTroyOunce
-) {
-  const usdPerOunce = toNumber(usdPerTroyOunce);
-
-  if (!usdPerOunce) {
-    return 0;
-  }
-
-  return usdPerOunce * TOLA_IN_TROY_OUNCE;
-}
-
-// ---------------------------------------------------------
-// Main LIVE Market Rates Function
+// IMPORTANT:
+// The browser does NOT call Metals.Dev directly.
+//
+// Browser
+//   ↓
+// /api/market-rates
+//   ↓
+// Vercel Server
+//   ↓
+// Metals.Dev
+//
+// Therefore METALS_API_KEY stays safely on Vercel.
 // ---------------------------------------------------------
 export async function fetchLiveMarketRates() {
   try {
-    // Fetch both APIs at the same time
-    const [metalData, usdPkr] = await Promise.all([
-      fetchMetalRates(),
-      fetchUsdPkr(),
-    ]);
+    const response = await fetch('/api/market-rates', {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
 
-    const metals = metalData?.metals || {};
+    const data = await response.json();
 
-    // Metals.Dev returns prices in USD per Troy Ounce
-    const goldUsdOz = toNumber(metals.gold);
-    const silverUsdOz = toNumber(metals.silver);
-    const platinumUsdOz = toNumber(metals.platinum);
-    const copperUsdOz = toNumber(metals.copper);
+    if (!response.ok || !data?.success) {
+      throw new Error(
+        data?.error ||
+          `Market API failed with status ${response.status}`
+      );
+    }
 
-    // Convert to PKR per Tola
-    const goldTola = usdPerTroyOunceToPkrPerTola(
-      goldUsdOz,
-      usdPkr
-    );
+    // -----------------------------------------------------
+    // Validate returned data
+    // -----------------------------------------------------
 
-    const silverTola = usdPerTroyOunceToPkrPerTola(
-      silverUsdOz,
-      usdPkr
-    );
+    const gold = data?.gold || {};
+    const silver = data?.silver || {};
+    const platinum = data?.platinum || {};
+    const copper = data?.copper || {};
 
-    const platinumTola = usdPerTroyOunceToPkrPerTola(
-      platinumUsdOz,
-      usdPkr
-    );
+    const usdPkr = toNumber(data?.usdPkr);
 
-    const copperTola = usdPerTroyOunceToPkrPerTola(
-      copperUsdOz,
-      usdPkr
-    );
+    if (!usdPkr) {
+      throw new Error('USD/PKR rate unavailable.');
+    }
 
-    // USD value per Tola
-    const goldUsdTola =
-      usdPerTroyOunceToUsdPerTola(goldUsdOz);
-
-    const silverUsdTola =
-      usdPerTroyOunceToUsdPerTola(silverUsdOz);
-
-    const platinumUsdTola =
-      usdPerTroyOunceToUsdPerTola(platinumUsdOz);
-
-    const copperUsdTola =
-      usdPerTroyOunceToUsdPerTola(copperUsdOz);
+    // -----------------------------------------------------
+    // Final result used by Home.jsx
+    // -----------------------------------------------------
 
     const result = {
       // PKR per Tola
-      gold: goldTola,
-      silver: silverTola,
-      platinum: platinumTola,
-      copper: copperTola,
+      gold: toNumber(gold.pkrPerTola),
+      silver: toNumber(silver.pkrPerTola),
+      platinum: toNumber(platinum.pkrPerTola),
+      copper: toNumber(copper.pkrPerTola),
 
       // USD per Tola
-      goldUsd: goldUsdTola,
-      silverUsd: silverUsdTola,
-      platinumUsd: platinumUsdTola,
-      copperUsd: copperUsdTola,
+      goldUsd: toNumber(gold.usdPerTola),
+      silverUsd: toNumber(silver.usdPerTola),
+      platinumUsd: toNumber(platinum.usdPerTola),
+      copperUsd: toNumber(copper.usdPerTola),
 
-      // USD/PKR
+      // USD / PKR
       usdPkr,
 
-      // Original international spot prices
-      goldUsdOz,
-      silverUsdOz,
-      platinumUsdOz,
-      copperUsdOz,
+      // USD per gram
+      goldUsdGram: toNumber(gold.usdPerGram),
+      silverUsdGram: toNumber(silver.usdPerGram),
+      platinumUsdGram: toNumber(platinum.usdPerGram),
+      copperUsdGram: toNumber(copper.usdPerGram),
 
-      // API timestamp
+      // Timestamp
       timestamp:
-        metalData?.timestamp ||
+        data?.timestamp ||
         new Date().toISOString(),
 
-      currency: 'USD',
-      unit: 'toz',
+      source:
+        data?.source ||
+        'Metals.Dev',
 
-      source: 'Metals.Dev',
+      unit:
+        data?.unit ||
+        'g',
     };
 
-    console.log('LIVE MARKET RATES:', result);
+    console.log(
+      'LIVE MARKET RATES:',
+      result
+    );
 
     return result;
   } catch (error) {
@@ -224,72 +113,98 @@ export async function fetchLiveMarketRates() {
     );
 
     // IMPORTANT:
-    // Do NOT return fake/static rates.
-    // Let Home.jsx know that live data failed.
+    // Never return fake/static rates.
     throw error;
   }
 }
 
 // ---------------------------------------------------------
-// Individual conversion helpers
+// USD → PKR
 // ---------------------------------------------------------
-
 export function usdToPkr(amountUsd, usdPkr) {
   const amount = toNumber(amountUsd);
   const rate = toNumber(usdPkr);
 
-  if (!amount || !rate) return 0;
+  if (!amount || !rate) {
+    return 0;
+  }
 
   return amount * rate;
 }
 
+// ---------------------------------------------------------
+// PKR → USD
+// ---------------------------------------------------------
 export function pkrToUsd(amountPkr, usdPkr) {
   const amount = toNumber(amountPkr);
   const rate = toNumber(usdPkr);
 
-  if (!amount || !rate) return 0;
+  if (!amount || !rate) {
+    return 0;
+  }
 
   return amount / rate;
 }
 
-export function troyOunceToTola(amount) {
-  const value = toNumber(amount);
-
-  if (!value) return 0;
-
-  return value * TOLA_IN_TROY_OUNCE;
-}
-
-export function tolaToTroyOunce(amount) {
-  const value = toNumber(amount);
-
-  if (!value) return 0;
-
-  return value / TOLA_IN_TROY_OUNCE;
-}
-
+// ---------------------------------------------------------
+// Grams → Tola
+// ---------------------------------------------------------
 export function gramsToTola(grams) {
   const value = toNumber(grams);
 
-  if (!value) return 0;
+  if (!value) {
+    return 0;
+  }
 
   return value / TOLA_GRAMS;
 }
 
+// ---------------------------------------------------------
+// Tola → Grams
+// ---------------------------------------------------------
 export function tolaToGrams(tola) {
   const value = toNumber(tola);
 
-  if (!value) return 0;
+  if (!value) {
+    return 0;
+  }
 
   return value * TOLA_GRAMS;
 }
 
 // ---------------------------------------------------------
+// Price per Gram → Price per Tola
+// ---------------------------------------------------------
+export function pricePerGramToTola(
+  pricePerGram
+) {
+  const value = toNumber(pricePerGram);
+
+  if (!value) {
+    return 0;
+  }
+
+  return value * TOLA_GRAMS;
+}
+
+// ---------------------------------------------------------
+// Price per Tola → Price per Gram
+// ---------------------------------------------------------
+export function pricePerTolaToGram(
+  pricePerTola
+) {
+  const value = toNumber(pricePerTola);
+
+  if (!value) {
+    return 0;
+  }
+
+  return value / TOLA_GRAMS;
+}
+
+// ---------------------------------------------------------
 // Constants
 // ---------------------------------------------------------
-
 export const CONVERSION_CONSTANTS = {
-  TROY_OUNCE_GRAMS,
   TOLA_GRAMS,
-  TOLA_IN_TROY_OUNCE,
 };
