@@ -1,12 +1,8 @@
 // api/market-rates.js
 
-const TROY_OUNCE_GRAMS = 31.1034768;
 const TOLA_GRAMS = 11.6638125;
-const TOLA_IN_TROY_OUNCE =
-  TOLA_GRAMS / TROY_OUNCE_GRAMS;
 
 export default async function handler(req, res) {
-  // Only GET requests
   if (req.method !== 'GET') {
     return res.status(405).json({
       success: false,
@@ -19,18 +15,31 @@ export default async function handler(req, res) {
   if (!apiKey) {
     return res.status(500).json({
       success: false,
-      error: 'METALS_API_KEY is not configured on Vercel.',
+      error: 'METALS_API_KEY is not configured.',
     });
   }
 
   try {
-    // Metals.Dev latest endpoint
-    // USD + Troy Ounce
+    /*
+     * We request:
+     * currency = USD
+     * unit     = gram
+     *
+     * This makes all metals comparable:
+     * Gold      -> USD / gram
+     * Silver    -> USD / gram
+     * Platinum  -> USD / gram
+     * Copper    -> USD / gram
+     *
+     * Metals.Dev normally gives industrial metals such as
+     * copper in metric tonnes, but the unit parameter allows
+     * conversion to grams.
+     */
     const url =
       `https://api.metals.dev/v1/latest` +
       `?api_key=${encodeURIComponent(apiKey)}` +
       `&currency=USD` +
-      `&unit=toz`;
+      `&unit=g`;
 
     const response = await fetch(url, {
       headers: {
@@ -48,46 +57,50 @@ export default async function handler(req, res) {
         success: false,
         error:
           data?.error_message ||
-          data?.error?.message ||
           'Metals.Dev API request failed.',
+        errorCode: data?.error_code || null,
       });
     }
 
     const metals = data.metals || {};
     const currencies = data.currencies || {};
 
-    // USD -> PKR
+    /*
+     * Because the API request is in USD,
+     * currencies.PKR represents PKR for USD.
+     */
     const usdPkr = Number(currencies.PKR);
 
     if (!Number.isFinite(usdPkr) || usdPkr <= 0) {
-      throw new Error('USD/PKR rate not available.');
+      throw new Error('USD/PKR rate unavailable.');
     }
 
-    // Metals.Dev prices are USD per Troy Ounce
-    const goldUsdOz = Number(metals.gold);
-    const silverUsdOz = Number(metals.silver);
-    const platinumUsdOz = Number(metals.platinum);
-    const copperUsdOz = Number(metals.copper);
+    const goldUsdGram = Number(metals.gold);
+    const silverUsdGram = Number(metals.silver);
+    const platinumUsdGram = Number(metals.platinum);
+    const copperUsdGram = Number(metals.copper);
 
-    // Convert USD / Troy Ounce -> USD / Tola
-    const toUsdPerTola = (usdPerOz) => {
-      if (!Number.isFinite(usdPerOz) || usdPerOz <= 0) {
-        return 0;
-      }
+    function validNumber(value) {
+      return Number.isFinite(value) && value > 0;
+    }
 
-      return usdPerOz * TOLA_IN_TROY_OUNCE;
-    };
+    /*
+     * USD per gram -> USD per Tola
+     */
+    function usdGramToUsdTola(usdGram) {
+      if (!validNumber(usdGram)) return 0;
 
-    // USD / Tola -> PKR / Tola
-    const toPkrPerTola = (usdPerOz) => {
-      const usdTola = toUsdPerTola(usdPerOz);
+      return usdGram * TOLA_GRAMS;
+    }
 
-      if (!usdTola) {
-        return 0;
-      }
+    /*
+     * USD per gram -> PKR per Tola
+     */
+    function usdGramToPkrTola(usdGram) {
+      if (!validNumber(usdGram)) return 0;
 
-      return usdTola * usdPkr;
-    };
+      return usdGram * TOLA_GRAMS * usdPkr;
+    }
 
     const result = {
       success: true,
@@ -95,49 +108,51 @@ export default async function handler(req, res) {
       source: 'Metals.Dev',
 
       timestamp:
-        data.timestamp || new Date().toISOString(),
+        data.timestamp ||
+        data.timestamps?.metal ||
+        new Date().toISOString(),
 
       currency: 'USD',
-      unit: 'toz',
+      unit: 'g',
 
       conversion: {
-        troyOunceGrams: TROY_OUNCE_GRAMS,
         tolaGrams: TOLA_GRAMS,
-        tolaInTroyOunce: TOLA_IN_TROY_OUNCE,
       },
 
-      currencyRates: {
-        usdPkr,
+      usdPkr,
+
+      gold: {
+        usdPerGram: goldUsdGram,
+        usdPerTola: usdGramToUsdTola(goldUsdGram),
+        pkrPerTola: usdGramToPkrTola(goldUsdGram),
       },
 
-      metals: {
-        gold: {
-          usdPerOz: goldUsdOz,
-          usdPerTola: toUsdPerTola(goldUsdOz),
-          pkrPerTola: toPkrPerTola(goldUsdOz),
-        },
+      silver: {
+        usdPerGram: silverUsdGram,
+        usdPerTola: usdGramToUsdTola(silverUsdGram),
+        pkrPerTola: usdGramToPkrTola(silverUsdGram),
+      },
 
-        silver: {
-          usdPerOz: silverUsdOz,
-          usdPerTola: toUsdPerTola(silverUsdOz),
-          pkrPerTola: toPkrPerTola(silverUsdOz),
-        },
+      platinum: {
+        usdPerGram: platinumUsdGram,
+        usdPerTola: usdGramToUsdTola(platinumUsdGram),
+        pkrPerTola: usdGramToPkrTola(platinumUsdGram),
+      },
 
-        platinum: {
-          usdPerOz: platinumUsdOz,
-          usdPerTola: toUsdPerTola(platinumUsdOz),
-          pkrPerTola: toPkrPerTola(platinumUsdOz),
-        },
-
-        copper: {
-          usdPerOz: copperUsdOz,
-          usdPerTola: toUsdPerTola(copperUsdOz),
-          pkrPerTola: toPkrPerTola(copperUsdOz),
-        },
+      copper: {
+        usdPerGram: copperUsdGram,
+        usdPerTola: usdGramToUsdTola(copperUsdGram),
+        pkrPerTola: usdGramToPkrTola(copperUsdGram),
       },
     };
 
-    // Small cache so many visitors don't hammer the provider.
+    /*
+     * Vercel cache:
+     * Metals.Dev maximum delay is around 60 seconds.
+     *
+     * This prevents every visitor from creating a new
+     * Metals.Dev request.
+     */
     res.setHeader(
       'Cache-Control',
       's-maxage=60, stale-while-revalidate=30'
@@ -145,7 +160,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json(result);
   } catch (error) {
-    console.error('Market rates server error:', error);
+    console.error('Market rates error:', error);
 
     return res.status(500).json({
       success: false,
