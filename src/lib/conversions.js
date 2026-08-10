@@ -12,37 +12,32 @@ export const LATEST_RATES = {
   usdPkr: 278.70     // Base exchange rate
 };
 
-// Live Rate Fetcher using CORS-friendly public feed
+// Live Rate Fetcher using direct stable public endpoint
 export async function fetchLiveMarketRates() {
   try {
-    // Using AllOrigins CORS proxy to safely fetch live international spot prices from browser
-    const targetUrl = encodeURIComponent('https://data-asg.goldprice.org/dbspot/USD');
-    const response = await fetch(`https://api.allorigins.win/get?url=${targetUrl}`);
-    const wrapper = await response.json();
+    const response = await fetch('https://api.gold-api.com/price/XAU');
+    const data = await response.json();
     
-    if (wrapper && wrapper.contents) {
-      const data = JSON.parse(wrapper.contents);
-      if (data && data.items && data.items.length > 0) {
-        const liveOunceUSD = data.items[0].xauPrice; // Live ounce price
-        const liveSilverOunceUSD = data.items[0].xagPrice || 30;
-        const usdPkrRate = LATEST_RATES.usdPkr;
+    if (data && data.price) {
+      const liveOunceUSD = data.price; // Live ounce price in USD
+      const usdPkrRate = LATEST_RATES.usdPkr;
 
-        // Convert Troy Ounce USD to Per Tola PKR
-        const goldTolaPKR = (liveOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
-        const silverTolaPKR = (liveSilverOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
+      // Convert Troy Ounce USD to Per Tola PKR
+      const goldTolaPKR = (liveOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
+      // Silver approximate ratio calculation based on market standard
+      const silverTolaPKR = (liveOunceUSD / 85 / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
 
-        return {
-          gold: Math.round(goldTolaPKR),
-          silver: Math.round(silverTolaPKR),
-          platinum: LATEST_RATES.platinum || 123000,
-          copper: LATEST_RATES.copper || 3750,
-          usdPkr: usdPkrRate,
-          isLive: true
-        };
-      }
+      return {
+        gold: Math.round(goldTolaPKR),
+        silver: Math.round(silverTolaPKR),
+        platinum: 123000,
+        copper: 3750,
+        usdPkr: usdPkrRate,
+        isLive: true
+      };
     }
   } catch (error) {
-    console.error('Live API fetch failed via proxy:', error);
+    console.error('Live API fetch failed:', error);
   }
   
   return LATEST_RATES; // Returns zero/fallback if network fails
