@@ -12,24 +12,20 @@ export const LATEST_RATES = {
   usdPkr: 278.70     // 1 USD = 278.70 PKR
 };
 
-// Live Rate Fetcher from Free Public / Global Financial Endpoints
+// Live Rate Fetcher using reliable public gold feed
 export async function fetchLiveMarketRates() {
   try {
-    // Fetching live XAU (Gold) and XAG (Silver) rates against USD
-    const response = await fetch('https://api.metals.live/v1/spot');
+    // Using a reliable open gold rate endpoint
+    const response = await fetch('https://data-asg.goldprice.org/dbspot/USD');
     const data = await response.json();
     
-    // Find gold and silver from response array
-    const goldObj = data.find(item => item.gold);
-    const silverObj = data.find(item => item.silver);
-
-    if (goldObj && silverObj) {
-      const liveOunceUSD = goldObj.gold;
-      const liveSilverOunceUSD = silverObj.silver;
+    if (data && data.items && data.items.length > 0) {
+      // xauPrice gives the live ounce price in USD (e.g. ~4320.11)
+      const liveOunceUSD = data.items[0].xauPrice;
+      const liveSilverOunceUSD = data.items[0].xagPrice || 30; // fallback silver if missing
       const usdPkrRate = LATEST_RATES.usdPkr;
 
       // Convert Troy Ounce USD to Per Tola PKR
-      // Formula: (OunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate
       const goldTolaPKR = (liveOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
       const silverTolaPKR = (liveSilverOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
 
@@ -43,7 +39,7 @@ export async function fetchLiveMarketRates() {
       };
     }
   } catch (error) {
-    console.warn('Live API fetch failed, falling back to default rates:', error);
+    console.warn('Live API fetch failed, using fallback rates:', error);
   }
   
   return LATEST_RATES; // Fallback if network/API fails
