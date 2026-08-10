@@ -1,22 +1,27 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { BarChart2, LineChart } from 'lucide-react';
-import { formatCurrency, LATEST_RATES } from '@/lib/conversions';
 
 export default function Charts() {
-  const { currency = 'PKR' } = useOutletContext() || {};
+  const context = useOutletContext() || {};
+  const currency = context.currency || 'PKR';
+  const USD_RATE = 278.70;
+
   const [selectedMetal, setSelectedMetal] = useState('gold');
   const [timeframe, setTimeframe] = useState('10Y');
   const [chartType, setChartType] = useState('line');
-  
-  // Hover State for Tooltip
   const [hoveredPoint, setHoveredPoint] = useState(null);
 
-  const USD_RATE = LATEST_RATES?.usdPkr || 278.70;
+  const formatCurrency = (pkrAmount) => {
+    if (currency === 'USD') {
+      const usdVal = pkrAmount / USD_RATE;
+      return `$ ${usdVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    return `Rs ${pkrAmount.toLocaleString('en-PK')}`;
+  };
 
   const getHistoricalData = () => {
     const isGold = selectedMetal === 'gold';
-
     switch (timeframe) {
       case '1D':
         return [
@@ -84,7 +89,6 @@ export default function Charts() {
     return pkrAmount >= 100000 ? `${(pkrAmount / 1000).toFixed(0)}k` : pkrAmount;
   };
 
-  // Generate SVG Points with Coordinates for Hover Detection
   const getPoints = () => {
     const width = 100;
     const height = 100;
@@ -175,8 +179,6 @@ export default function Charts() {
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-5 space-y-4 relative">
-        
-        {/* Active Tooltip Display */}
         <div className="min-h-[32px] flex items-center justify-between border-b border-border/50 pb-2">
           {hoveredPoint ? (
             <div className="flex justify-between items-center w-full bg-muted/60 px-3 py-1.5 rounded-lg border border-[#D4AF37]/30 transition-all">
@@ -184,7 +186,7 @@ export default function Charts() {
                 Time: <strong className="text-foreground">{hoveredPoint.label}</strong>
               </span>
               <span className="text-sm font-black text-[#D4AF37]">
-                {formatCurrency(hoveredPoint.price, currency, USD_RATE)}
+                {formatCurrency(hoveredPoint.price)}
               </span>
             </div>
           ) : (
@@ -201,7 +203,6 @@ export default function Charts() {
                 15,
                 Math.round(((item.price - minPrice) / (maxPrice - minPrice || 1)) * 75 + 20)
               );
-
               const isHovered = hoveredPoint?.label === item.label;
 
               return (
@@ -233,7 +234,6 @@ export default function Charts() {
           <div className="space-y-4">
             <div className="relative h-52 w-full pt-4">
               <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-                {/* Background Line */}
                 <path
                   d={generateSvgPath()}
                   fill="none"
@@ -241,13 +241,10 @@ export default function Charts() {
                   strokeWidth="3"
                   vectorEffect="non-scaling-stroke"
                 />
-
-                {/* Interactive Points on Line */}
                 {points.map((pt, idx) => {
                   const isHovered = hoveredPoint?.label === pt.label;
                   return (
                     <g key={idx}>
-                      {/* Active Highlight Ring */}
                       {isHovered && (
                         <circle
                           cx={pt.x}
@@ -267,7 +264,6 @@ export default function Charts() {
                         strokeWidth="1.5"
                         vectorEffect="non-scaling-stroke"
                       />
-                      {/* Big invisible touch target for easy hover / click */}
                       <circle
                         cx={pt.x}
                         cy={pt.y}
@@ -303,13 +299,13 @@ export default function Charts() {
         <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-xs text-muted-foreground">High</p>
           <p className="text-sm font-bold text-foreground mt-0.5">
-            {formatCurrency(maxPrice, currency, USD_RATE)}
+            {formatCurrency(maxPrice)}
           </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-xs text-muted-foreground">Low</p>
           <p className="text-sm font-bold text-foreground mt-0.5">
-            {formatCurrency(minPrice, currency, USD_RATE)}
+            {formatCurrency(minPrice)}
           </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
