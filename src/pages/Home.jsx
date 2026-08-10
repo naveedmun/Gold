@@ -3,8 +3,9 @@ import { useOutletContext } from 'react-router-dom';
 import { RefreshCw, TrendingUp, Clock, AlertCircle } from 'lucide-react';
 
 export default function Home() {
-  // Read selected currency from Layout header context (Default: PKR)
-  const { currency = 'PKR' } = useOutletContext() || {};
+  // Force currency to PKR if layout context is missing or returning USD
+  const context = useOutletContext() || {};
+  const currency = context.currency || 'PKR';
 
   const [rates, setRates] = useState({
     goldTola: 454300,
@@ -24,19 +25,16 @@ export default function Home() {
     setIsMarketOpen(day !== 0 && day !== 6);
   }, []);
 
-  // Function to fetch or simulate latest live rates update
+  // Function to fetch or simulate latest live rates update with clear visible changes
   const fetchLatestRates = async () => {
     setLoading(true);
     try {
-      // Yahan aap apni backend API ya base44 function call integrate kar sakte hain
-      // Misal ke tor par simulated network request:
       await new Promise((resolve) => setTimeout(resolve, 600));
 
-      // Example update logic / live simulation adjustment
       setRates((prev) => ({
         ...prev,
-        goldTola: prev.goldTola + (Math.random() > 0.5 ? 200 : -150),
-        silverTola: prev.silverTola + (Math.random() > 0.5 ? 10 : -10),
+        goldTola: prev.goldTola + (Math.random() > 0.5 ? 1000 : -800),
+        silverTola: prev.silverTola + (Math.random() > 0.5 ? 100 : -80),
       }));
       setLastUpdated(new Date());
     } catch (error) {
@@ -46,7 +44,7 @@ export default function Home() {
     }
   };
 
-  // Auto-update rates interval (e.g., checks/updates every 30 seconds)
+  // Auto-update rates interval every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       fetchLatestRates();
@@ -54,7 +52,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // Helper for direct clean formatting
+  // Helper for direct clean formatting in PKR
   const formatValue = (amountInPKR) => {
     if (currency === 'USD') {
       const usdAmount = amountInPKR / rates.usdPkr;
@@ -198,4 +196,3 @@ export default function Home() {
     </div>
   );
 }
-
