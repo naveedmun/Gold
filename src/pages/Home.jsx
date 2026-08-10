@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { RefreshCw, TrendingUp, Clock, AlertCircle } from 'lucide-react';
+import { fetchLiveMarketRates } from '@/lib/conversions';
 
 export default function Home() {
-  // Force currency to PKR if layout context is missing or returning USD
   const context = useOutletContext() || {};
   const currency = context.currency || 'PKR';
 
-  // Initialize rates from localStorage if available, otherwise use defaults
   const [rates, setRates] = useState(() => {
     const savedRates = localStorage.getItem('sarafa_live_rates');
     if (savedRates) {
@@ -18,7 +17,7 @@ export default function Home() {
       }
     }
     return {
-      goldTola: 454300,
+      goldTola: 1202500, // Synced with International $4,320/oz Spot Rate
       silverTola: 6940,
       platinumTola: 123000,
       copperTola: 3750,
@@ -28,47 +27,48 @@ export default function Home() {
 
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [isMarketOpen, setIsMarketOpen] = useState(false);
+  const [isMarketOpen, setIsMarketOpen] = useState(true);
 
-  // Check market timings (Open Monday to Friday)
+  // Check market timings
   useEffect(() => {
     const day = new Date().getDay();
     setIsMarketOpen(day !== 0 && day !== 6);
   }, []);
 
-  // Function to fetch or simulate latest live rates update with clear visible changes
+  // Fetch REAL live rates from Global Market API
   const fetchLatestRates = async () => {
     setLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      setRates((prev) => {
+      const liveData = await fetchLiveMarketRates();
+      if (liveData) {
         const updated = {
-          ...prev,
-          goldTola: prev.goldTola + (Math.random() > 0.5 ? 1000 : -800),
-          silverTola: prev.silverTola + (Math.random() > 0.5 ? 100 : -80),
+          goldTola: liveData.gold || rates.goldTola,
+          silverTola: liveData.silver || rates.silverTola,
+          platinumTola: liveData.platinum || rates.platinumTola,
+          copperTola: liveData.copper || rates.copperTola,
+          usdPkr: liveData.usdPkr || rates.usdPkr,
         };
-        // Save updated rates to localStorage so they persist on refresh
+        setRates(updated);
         localStorage.setItem('sarafa_live_rates', JSON.stringify(updated));
-        return updated;
-      });
-      setLastUpdated(new Date());
+        setLastUpdated(new Date());
+      }
     } catch (error) {
-      console.error('Failed to update rates', error);
+      console.error('Failed to fetch real live rates', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Auto-update rates interval every 30 seconds
+  // Auto-fetch real market rates on initial load & every 30 seconds
   useEffect(() => {
+    fetchLatestRates();
     const interval = setInterval(() => {
       fetchLatestRates();
     }, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Helper for direct clean formatting in PKR
+  // Formatter for PKR / USD
   const formatValue = (amountInPKR) => {
     if (currency === 'USD') {
       const usdAmount = amountInPKR / rates.usdPkr;
@@ -77,10 +77,13 @@ export default function Home() {
     return `Rs ${amountInPKR.toLocaleString('en-PK')}`;
   };
 
-  // Helper to show USD conversion subtext when PKR is active
+  // Show USD subtext when PKR is selected
   const getUsdSubtext = (amountInPKR) => {
     if (currency === 'PKR') {
-      const usdAmount = (amountInPKR / rates.usdPkr).toFixed(2);
+      const usdAmount = (amountInPKR / rates.usdPkr).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
       return `(~ $${usdAmount} USD)`;
     }
     return null;
@@ -91,7 +94,7 @@ export default function Home() {
       {/* Top Status Header */}
       <div className="flex items-center justify-between bg-card p-4 rounded-2xl border border-border shadow-sm">
         <div className="flex items-center gap-2.5">
-          <span className={`h-3 w-3 rounded-full flex-shrink-0 ${isMarketOpen ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+          <span className={`h-3 w-3 rounded-full flex-shrink-0 ${isMarketOpen ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-foreground">Pakistani Sarafa Rates</h2>
@@ -102,7 +105,7 @@ export default function Home() {
                     : 'bg-amber-500/15 text-amber-600'
                 }`}
               >
-                {isMarketOpen ? 'MARKET OPEN' : 'MARKET CLOSED'}
+                {isMarketOpen ? 'MARKET OPEN (LIVE)' : 'MARKET CLOSED'}
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -117,7 +120,7 @@ export default function Home() {
           onClick={fetchLatestRates}
           disabled={loading}
           className="p-2 rounded-xl bg-card border border-border hover:bg-muted/50 transition-colors flex items-center justify-center"
-          title="Refresh Rates"
+          title="Refresh Real Market Rates"
         >
           <RefreshCw className={`h-4 w-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -152,7 +155,7 @@ export default function Home() {
             )}
           </div>
           <span className="text-xs font-semibold text-emerald-600 flex items-center gap-0.5">
-            <TrendingUp className="h-3.5 w-3.5" /> +1.14%
+            <TrendingUp className="h-3.5 w-3.5" /> Live Spot
           </span>
         </div>
       </div>
