@@ -3,44 +3,18 @@ export const GRAMS_PER_TOLA = 11.6638;
 export const GRAMS_PER_TROY_OUNCE = 31.1035;
 export const TOLAS_PER_TROY_OUNCE = GRAMS_PER_TROY_OUNCE / GRAMS_PER_TOLA; // ~2.6667
 
-// Clean base object with zero values (No hardcoded dummy rates)
+// STATIC RATES: Yeh rates ab freeze ho gaye hain, update nahi honge
 export const LATEST_RATES = {
-  gold: 0,
-  silver: 0,
-  platinum: 0,
-  copper: 0,
-  usdPkr: 278.70     // Base exchange rate
+  gold: 454253,      // Fixed Gold Tola Rate
+  silver: 6940,      // Fixed Silver Tola Rate
+  platinum: 123000,  // Fixed Platinum Tola Rate
+  copper: 3750,      // Fixed Copper Tola Rate
+  usdPkr: 278.70     // Fixed Exchange Rate
 };
 
-// Live Rate Fetcher using direct stable public endpoint
+// API Fetcher ko block kar diya hai taake data freeze rahe
 export async function fetchLiveMarketRates() {
-  try {
-    const response = await fetch('https://api.gold-api.com/price/XAU');
-    const data = await response.json();
-    
-    if (data && data.price) {
-      const liveOunceUSD = data.price; // Live ounce price in USD
-      const usdPkrRate = LATEST_RATES.usdPkr;
-
-      // Convert Troy Ounce USD to Per Tola PKR
-      const goldTolaPKR = (liveOunceUSD / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
-      // Silver approximate ratio calculation based on market standard
-      const silverTolaPKR = (liveOunceUSD / 85 / TOLAS_PER_TROY_OUNCE) * usdPkrRate;
-
-      return {
-        gold: Math.round(goldTolaPKR),
-        silver: Math.round(silverTolaPKR),
-        platinum: 123000,
-        copper: 3750,
-        usdPkr: usdPkrRate,
-        isLive: true
-      };
-    }
-  } catch (error) {
-    console.error('Live API fetch failed:', error);
-  }
-  
-  return LATEST_RATES; // Returns zero/fallback if network fails
+  return LATEST_RATES; 
 }
 
 // Convert from per-tola price to other units
