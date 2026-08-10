@@ -7,12 +7,23 @@ export default function Home() {
   const context = useOutletContext() || {};
   const currency = context.currency || 'PKR';
 
-  const [rates, setRates] = useState({
-    goldTola: 454300,
-    silverTola: 6940,
-    platinumTola: 123000,
-    copperTola: 3750,
-    usdPkr: 278.70,
+  // Initialize rates from localStorage if available, otherwise use defaults
+  const [rates, setRates] = useState(() => {
+    const savedRates = localStorage.getItem('sarafa_live_rates');
+    if (savedRates) {
+      try {
+        return JSON.parse(savedRates);
+      } catch (e) {
+        console.error('Failed to parse saved rates', e);
+      }
+    }
+    return {
+      goldTola: 454300,
+      silverTola: 6940,
+      platinumTola: 123000,
+      copperTola: 3750,
+      usdPkr: 278.70,
+    };
   });
 
   const [loading, setLoading] = useState(false);
@@ -31,11 +42,16 @@ export default function Home() {
     try {
       await new Promise((resolve) => setTimeout(resolve, 600));
 
-      setRates((prev) => ({
-        ...prev,
-        goldTola: prev.goldTola + (Math.random() > 0.5 ? 1000 : -800),
-        silverTola: prev.silverTola + (Math.random() > 0.5 ? 100 : -80),
-      }));
+      setRates((prev) => {
+        const updated = {
+          ...prev,
+          goldTola: prev.goldTola + (Math.random() > 0.5 ? 1000 : -800),
+          silverTola: prev.silverTola + (Math.random() > 0.5 ? 100 : -80),
+        };
+        // Save updated rates to localStorage so they persist on refresh
+        localStorage.setItem('sarafa_live_rates', JSON.stringify(updated));
+        return updated;
+      });
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to update rates', error);
