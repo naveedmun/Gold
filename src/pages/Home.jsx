@@ -7,22 +7,13 @@ export default function Home() {
   const context = useOutletContext() || {};
   const currency = context.currency || 'PKR';
 
-  const [rates, setRates] = useState(() => {
-    const savedRates = localStorage.getItem('sarafa_live_rates');
-    if (savedRates) {
-      try {
-        return JSON.parse(savedRates);
-      } catch (e) {
-        console.error('Failed to parse saved rates', e);
-      }
-    }
-    return {
-      goldTola: 1202500, // Synced with International $4,320/oz Spot Rate
-      silverTola: 6940,
-      platinumTola: 123000,
-      copperTola: 3750,
-      usdPkr: 278.70,
-    };
+  // Initial state zero rakhi hai taake koi fake/static rate load na ho
+  const [rates, setRates] = useState({
+    goldTola: 0,
+    silverTola: 0,
+    platinumTola: 0,
+    copperTola: 0,
+    usdPkr: 278.70,
   });
 
   const [loading, setLoading] = useState(false);
@@ -40,16 +31,15 @@ export default function Home() {
     setLoading(true);
     try {
       const liveData = await fetchLiveMarketRates();
-      if (liveData) {
+      if (liveData && liveData.gold) {
         const updated = {
-          goldTola: liveData.gold || rates.goldTola,
-          silverTola: liveData.silver || rates.silverTola,
-          platinumTola: liveData.platinum || rates.platinumTola,
-          copperTola: liveData.copper || rates.copperTola,
-          usdPkr: liveData.usdPkr || rates.usdPkr,
+          goldTola: liveData.gold,
+          silverTola: liveData.silver,
+          platinumTola: liveData.platinum || 123000,
+          copperTola: liveData.copper || 3750,
+          usdPkr: liveData.usdPkr || 278.70,
         };
         setRates(updated);
-        localStorage.setItem('sarafa_live_rates', JSON.stringify(updated));
         setLastUpdated(new Date());
       }
     } catch (error) {
@@ -70,6 +60,7 @@ export default function Home() {
 
   // Formatter for PKR / USD
   const formatValue = (amountInPKR) => {
+    if (!amountInPKR || amountInPKR === 0) return 'Loading...';
     if (currency === 'USD') {
       const usdAmount = amountInPKR / rates.usdPkr;
       return `$ ${usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -79,6 +70,7 @@ export default function Home() {
 
   // Show USD subtext when PKR is selected
   const getUsdSubtext = (amountInPKR) => {
+    if (!amountInPKR || amountInPKR === 0) return null;
     if (currency === 'PKR') {
       const usdAmount = (amountInPKR / rates.usdPkr).toLocaleString('en-US', {
         minimumFractionDigits: 2,
