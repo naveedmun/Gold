@@ -19,6 +19,22 @@ function toNumber(value) {
 }
 
 // ---------------------------------------------------------
+// Static Latest Rates Fallback (Fixed Rate: 418,599 PKR per tola)
+// ---------------------------------------------------------
+export const LATEST_RATES = {
+  gold: 418599,
+  silver: 5200,
+  platinum: 310000,
+  copper: 3500,
+  goldUsd: 2350,
+  silverUsd: 28,
+  platinumUsd: 1000,
+  copperUsd: 4.2,
+  usdPkr: 278,
+  timestamp: new Date().toISOString(),
+};
+
+// ---------------------------------------------------------
 // Fetch LIVE rates from our Vercel backend
 // ---------------------------------------------------------
 export async function fetchLiveMarketRates() {
@@ -51,15 +67,6 @@ export async function fetchLiveMarketRates() {
     const copperUsdOz =
       toNumber(data?.metals?.copper);
 
-    // -----------------------------------------------------
-    // USD/PKR
-    //
-    // Metals.Dev latest endpoint can provide currencies,
-    // but our backend currently requests USD metal prices.
-    //
-    // Fetch PKR conversion separately from backend.
-    // -----------------------------------------------------
-
     const usdPkrResponse =
       await fetch(
         'https://open.er-api.com/v6/latest/USD',
@@ -88,10 +95,6 @@ export async function fetchLiveMarketRates() {
       );
     }
 
-    // -----------------------------------------------------
-    // USD per Troy Ounce -> PKR per Tola
-    // -----------------------------------------------------
-
     const usdPerTroyOunceToPkrPerTola =
       (usdPerTroyOunce) => {
         const value =
@@ -107,10 +110,6 @@ export async function fetchLiveMarketRates() {
           usdPkr
         );
       };
-
-    // -----------------------------------------------------
-    // USD per Troy Ounce -> USD per Tola
-    // -----------------------------------------------------
 
     const usdPerTroyOunceToUsdPerTola =
       (usdPerTroyOunce) => {
@@ -128,7 +127,6 @@ export async function fetchLiveMarketRates() {
       };
 
     const result = {
-      // PKR / Tola
       gold:
         usdPerTroyOunceToPkrPerTola(
           goldUsdOz
@@ -149,7 +147,6 @@ export async function fetchLiveMarketRates() {
           copperUsdOz
         ),
 
-      // USD / Tola
       goldUsd:
         usdPerTroyOunceToUsdPerTola(
           goldUsdOz
@@ -170,10 +167,8 @@ export async function fetchLiveMarketRates() {
           copperUsdOz
         ),
 
-      // FX
       usdPkr,
 
-      // Original international prices
       goldUsdOz,
       silverUsdOz,
       platinumUsdOz,
@@ -188,11 +183,6 @@ export async function fetchLiveMarketRates() {
 
       source: 'Metals.Dev',
     };
-
-    console.log(
-      'LIVE MARKET RATES:',
-      result
-    );
 
     return result;
   } catch (error) {
@@ -314,3 +304,25 @@ export const CONVERSION_CONSTANTS = {
   TOLA_GRAMS,
   TOLA_IN_TROY_OUNCE,
 };
+
+// ---------------------------------------------------------
+// Formatting Helpers
+// ---------------------------------------------------------
+
+export function formatPKR(amount) {
+  const value = toNumber(amount);
+  return value.toLocaleString('en-PK', {
+    maximumFractionDigits: 0,
+  });
+}
+
+export function formatCurrency(amount) {
+  return formatPKR(amount);
+}
+
+export function getUsdSubtext(amountUsd) {
+  const value = toNumber(amountUsd);
+  return `$${value.toLocaleString('en-US', {
+    maximumFractionDigits: 2,
+  })}`;
+}
