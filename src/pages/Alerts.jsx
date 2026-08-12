@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, Plus, Trash2, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, Plus, Trash2, X, Loader2 } from 'lucide-react';
 import { formatPKR } from '@/lib/conversions';
 
-const STORAGE_KEY = 'gold-rates-price-alerts';
+const STORAGE_KEY = 'gold_rates_price_alerts';
 
 export default function Alerts() {
   const [alerts, setAlerts] = useState([]);
@@ -15,63 +15,49 @@ export default function Alerts() {
     target_price: '',
   });
 
-  const fetchAlerts = useCallback(() => {
+  // Load alerts from browser storage
+  useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
 
       if (saved) {
-        const parsed = JSON.parse(saved);
-        setAlerts(Array.isArray(parsed) ? parsed : []);
-      } else {
-        setAlerts([]);
+        setAlerts(JSON.parse(saved));
       }
     } catch (error) {
-      console.error('Failed to load price alerts:', error);
-      setAlerts([]);
+      console.error('Failed to load alerts:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchAlerts();
-  }, [fetchAlerts]);
-
+  // Save alerts
   const saveAlerts = (updatedAlerts) => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(updatedAlerts)
-      );
-
-      setAlerts(updatedAlerts);
-    } catch (error) {
-      console.error('Failed to save price alerts:', error);
-    }
+    setAlerts(updatedAlerts);
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(updatedAlerts)
+    );
   };
 
+  // Create alert
   const createAlert = () => {
-    const targetPrice = parseFloat(form.target_price);
+    const price = Number(form.target_price);
 
-    if (!Number.isFinite(targetPrice) || targetPrice <= 0) {
+    if (!price || price <= 0) {
       return;
     }
 
     const newAlert = {
-      id: `${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2, 9)}`,
+      id: Date.now().toString(),
       metal: form.metal,
       direction: form.direction,
-      target_price: targetPrice,
+      target_price: price,
       active: true,
       triggered: false,
-      created_date: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
 
-    const updatedAlerts = [newAlert, ...alerts];
-
-    saveAlerts(updatedAlerts);
+    saveAlerts([newAlert, ...alerts]);
 
     setForm({
       metal: 'gold',
@@ -82,25 +68,27 @@ export default function Alerts() {
     setShowForm(false);
   };
 
-  const toggleAlert = (alert) => {
-    const updatedAlerts = alerts.map((item) =>
-      item.id === alert.id
+  // Enable / disable alert
+  const toggleAlert = (alertId) => {
+    const updated = alerts.map((alert) =>
+      alert.id === alertId
         ? {
-            ...item,
-            active: !item.active,
+            ...alert,
+            active: !alert.active,
           }
-        : item
+        : alert
     );
 
-    saveAlerts(updatedAlerts);
+    saveAlerts(updated);
   };
 
-  const deleteAlert = (id) => {
-    const updatedAlerts = alerts.filter(
-      (alert) => alert.id !== id
+  // Delete alert
+  const deleteAlert = (alertId) => {
+    const updated = alerts.filter(
+      (alert) => alert.id !== alertId
     );
 
-    saveAlerts(updatedAlerts);
+    saveAlerts(updated);
   };
 
   return (
@@ -114,14 +102,14 @@ export default function Alerts() {
           </h1>
 
           <p className="text-sm text-muted-foreground">
-            Get notified on price moves
+            Set alerts for Gold and Silver prices
           </p>
         </div>
 
         <button
           onClick={() => setShowForm(!showForm)}
           className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#B8860B] text-white shadow-lg shadow-[#D4AF37]/20"
-          aria-label="Create price alert"
+          title="Create Price Alert"
         >
           {showForm ? (
             <X className="h-5 w-5" />
@@ -133,80 +121,92 @@ export default function Alerts() {
 
       {/* Create Alert Form */}
       {showForm && (
-        <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div className="rounded-2xl border border-border bg-card p-4 space-y-4">
 
           {/* Metal */}
-          <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-sm font-medium">
+              Metal
+            </label>
 
-            <button
-              onClick={() =>
-                setForm({
-                  ...form,
-                  metal: 'gold',
-                })
-              }
-              className={`rounded-lg py-2.5 text-sm font-semibold ${
-                form.metal === 'gold'
-                  ? 'bg-[#D4AF37] text-white'
-                  : 'bg-background border border-border'
-              }`}
-            >
-              Gold
-            </button>
+            <div className="grid grid-cols-2 gap-2 mt-2">
 
-            <button
-              onClick={() =>
-                setForm({
-                  ...form,
-                  metal: 'silver',
-                })
-              }
-              className={`rounded-lg py-2.5 text-sm font-semibold ${
-                form.metal === 'silver'
-                  ? 'bg-[#C0C0C0] text-white'
-                  : 'bg-background border border-border'
-              }`}
-            >
-              Silver
-            </button>
+              <button
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    metal: 'gold',
+                  })
+                }
+                className={`rounded-lg py-2.5 text-sm font-semibold ${
+                  form.metal === 'gold'
+                    ? 'bg-[#D4AF37] text-white'
+                    : 'bg-background border border-border'
+                }`}
+              >
+                Gold
+              </button>
 
+              <button
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    metal: 'silver',
+                  })
+                }
+                className={`rounded-lg py-2.5 text-sm font-semibold ${
+                  form.metal === 'silver'
+                    ? 'bg-[#C0C0C0] text-white'
+                    : 'bg-background border border-border'
+                }`}
+              >
+                Silver
+              </button>
+
+            </div>
           </div>
 
           {/* Direction */}
-          <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-sm font-medium">
+              Alert When Price Goes
+            </label>
 
-            <button
-              onClick={() =>
-                setForm({
-                  ...form,
-                  direction: 'above',
-                })
-              }
-              className={`rounded-lg py-2.5 text-sm font-semibold ${
-                form.direction === 'above'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background border border-border'
-              }`}
-            >
-              Above
-            </button>
+            <div className="grid grid-cols-2 gap-2 mt-2">
 
-            <button
-              onClick={() =>
-                setForm({
-                  ...form,
-                  direction: 'below',
-                })
-              }
-              className={`rounded-lg py-2.5 text-sm font-semibold ${
-                form.direction === 'below'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background border border-border'
-              }`}
-            >
-              Below
-            </button>
+              <button
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    direction: 'above',
+                  })
+                }
+                className={`rounded-lg py-2.5 text-sm font-semibold ${
+                  form.direction === 'above'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background border border-border'
+                }`}
+              >
+                Above ↑
+              </button>
 
+              <button
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    direction: 'below',
+                  })
+                }
+                className={`rounded-lg py-2.5 text-sm font-semibold ${
+                  form.direction === 'below'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background border border-border'
+                }`}
+              >
+                Below ↓
+              </button>
+
+            </div>
           </div>
 
           {/* Target Price */}
@@ -232,11 +232,7 @@ export default function Alerts() {
           {/* Create */}
           <button
             onClick={createAlert}
-            disabled={
-              !form.target_price ||
-              parseFloat(form.target_price) <= 0
-            }
-            className="w-full rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#B8860B] py-3 text-white font-semibold shadow-lg shadow-[#D4AF37]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#B8860B] py-3 text-white font-semibold shadow-lg shadow-[#D4AF37]/20"
           >
             Create Alert
           </button>
@@ -247,9 +243,8 @@ export default function Alerts() {
       {/* Alerts */}
       {loading ? (
         <div className="flex h-40 items-center justify-center">
-          <div className="h-8 w-8 rounded-full border-4 border-[#D4AF37]/30 border-t-[#D4AF37] animate-spin" />
+          <Loader2 className="h-8 w-8 animate-spin text-[#D4AF37]" />
         </div>
-
       ) : alerts.length === 0 ? (
 
         <div className="rounded-2xl border border-dashed border-border p-8 text-center">
@@ -305,8 +300,10 @@ export default function Alerts() {
 
                     <p className="text-xs text-muted-foreground">
                       {alert.metal} per Tola ·{' '}
-                      {alert.direction}{' '}
-                      {formatPKR(alert.target_price)}
+                      {alert.direction === 'above'
+                        ? 'Above'
+                        : 'Below'}{' '}
+                      Rs {formatPKR(alert.target_price)}
                     </p>
 
                   </div>
@@ -317,17 +314,14 @@ export default function Alerts() {
 
                   {/* Toggle */}
                   <button
-                    onClick={() => toggleAlert(alert)}
+                    onClick={() =>
+                      toggleAlert(alert.id)
+                    }
                     className={`relative h-6 w-11 rounded-full transition-colors ${
                       alert.active
                         ? 'bg-[#D4AF37]'
                         : 'bg-muted'
                     }`}
-                    aria-label={
-                      alert.active
-                        ? 'Disable alert'
-                        : 'Enable alert'
-                    }
                   >
                     <span
                       className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
@@ -340,9 +334,11 @@ export default function Alerts() {
 
                   {/* Delete */}
                   <button
-                    onClick={() => deleteAlert(alert.id)}
+                    onClick={() =>
+                      deleteAlert(alert.id)
+                    }
                     className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                    aria-label="Delete alert"
+                    title="Delete Alert"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
