@@ -15,23 +15,30 @@ export default async function handler(req, res) {
     const TOLA_IN_TROY_OUNCE =
       11.6638125 / 31.1034768;
 
-    // ------------------------------------------
-    // LIVE LATEST RATES
-    // ------------------------------------------
+    // ==================================================
+    // LIVE LATEST METALS.DEV RATES
+    // ==================================================
 
     const latestUrl =
-      `https://api.metals.dev/v1/latest?api_key=${API_KEY}&currency=USD&unit=toz`;
+      `https://api.metals.dev/v1/latest?api_key=${encodeURIComponent(
+        API_KEY
+      )}&currency=USD&unit=toz`;
 
     const latestRes = await fetch(latestUrl, {
+      method: 'GET',
       headers: {
         Accept: 'application/json',
       },
       cache: 'no-store',
     });
 
+    // IMPORTANT:
+    // Metals.Dev ka actual error response bhi read karna hai.
     if (!latestRes.ok) {
+      const errorText = await latestRes.text();
+
       throw new Error(
-        `Metals.Dev Latest API failed: ${latestRes.status}`
+        `Metals.Dev Latest API failed: ${latestRes.status} - ${errorText}`
       );
     }
 
@@ -40,9 +47,14 @@ export default async function handler(req, res) {
     if (latestData?.status !== 'success') {
       throw new Error(
         latestData?.error?.message ||
+        latestData?.error ||
         'Metals.Dev latest data unavailable'
       );
     }
+
+    // ==================================================
+    // READ METAL PRICES
+    // ==================================================
 
     const goldUsdOz =
       Number(latestData?.metals?.gold);
@@ -56,19 +68,45 @@ export default async function handler(req, res) {
     const copperUsdMt =
       Number(latestData?.metals?.copper);
 
-    // ------------------------------------------
+    if (!goldUsdOz || goldUsdOz <= 0) {
+      throw new Error(
+        'Gold price unavailable from Metals.Dev'
+      );
+    }
+
+    if (!silverUsdOz || silverUsdOz <= 0) {
+      throw new Error(
+        'Silver price unavailable from Metals.Dev'
+      );
+    }
+
+    if (!platinumUsdOz || platinumUsdOz <= 0) {
+      throw new Error(
+        'Platinum price unavailable from Metals.Dev'
+      );
+    }
+
+    // ==================================================
     // USD / PKR
-    // ------------------------------------------
+    // ==================================================
 
     const pkrRes = await fetch(
       'https://open.er-api.com/v6/latest/USD',
       {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
         cache: 'no-store',
       }
     );
 
     if (!pkrRes.ok) {
-      throw new Error('USD/PKR API failed');
+      const pkrError = await pkrRes.text();
+
+      throw new Error(
+        `USD/PKR API failed: ${pkrRes.status} - ${pkrError}`
+      );
     }
 
     const pkrData = await pkrRes.json();
@@ -77,12 +115,14 @@ export default async function handler(req, res) {
       Number(pkrData?.rates?.PKR);
 
     if (!usdPkr || usdPkr <= 0) {
-      throw new Error('USD/PKR rate unavailable');
+      throw new Error(
+        'USD/PKR rate unavailable'
+      );
     }
 
-    // ------------------------------------------
+    // ==================================================
     // PKR PER TOLA
-    // ------------------------------------------
+    // ==================================================
 
     const goldTolaPkr =
       goldUsdOz *
@@ -99,84 +139,108 @@ export default async function handler(req, res) {
       TOLA_IN_TROY_OUNCE *
       usdPkr;
 
-    const copperTolaPkr =
-      copperUsdMt *
-      TOLA_IN_TROY_OUNCE *
-      usdPkr;
+    /*
+     * Copper ka unit Metals.Dev response mein
+     * gold/silver ki tarah toz nahi hota.
+     *
+     * Is liye filhaal copper ko 0 rakha gaya hai
+     * taake wrong calculation display na ho.
+     */
+    const copperTolaPkr = 0;
 
-    // ------------------------------------------
-    // GOLD SPOT / CHANGE
-    // ------------------------------------------
-
-    const goldSpotUrl =
-      `https://api.metals.dev/v1/metal/spot?api_key=${API_KEY}&metal=gold&currency=USD`;
-
-    const goldSpotRes = await fetch(
-      goldSpotUrl,
-      {
-        headers: {
-          Accept: 'application/json',
-        },
-        cache: 'no-store',
-      }
-    );
+    // ==================================================
+    // GOLD 24H CHANGE
+    // ==================================================
 
     let goldChange = 0;
     let goldChangePercent = 0;
 
-    if (goldSpotRes.ok) {
-      const goldSpotData =
-        await goldSpotRes.json();
+    try {
+      const goldSpotUrl =
+        `https://api.metals.dev/v1/metal/spot?api_key=${encodeURIComponent(
+          API_KEY
+        )}&metal=gold&currency=USD`;
 
-      goldChange =
-        Number(
-          goldSpotData?.rate?.change
-        ) || 0;
+      const goldSpotRes = await fetch(
+        goldSpotUrl,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+          cache: 'no-store',
+        }
+      );
 
-      goldChangePercent =
-        Number(
-          goldSpotData?.rate?.change_percent
-        ) || 0;
+      if (goldSpotRes.ok) {
+        const goldSpotData =
+          await goldSpotRes.json();
+
+        goldChange =
+          Number(
+            goldSpotData?.rate?.change
+          ) || 0;
+
+        goldChangePercent =
+          Number(
+            goldSpotData?.rate?.change_percent
+          ) || 0;
+      }
+    } catch (goldError) {
+      console.error(
+        'Gold 24H change error:',
+        goldError
+      );
     }
 
-    // ------------------------------------------
-    // SILVER SPOT / CHANGE
-    // ------------------------------------------
-
-    const silverSpotUrl =
-      `https://api.metals.dev/v1/metal/spot?api_key=${API_KEY}&metal=silver&currency=USD`;
-
-    const silverSpotRes = await fetch(
-      silverSpotUrl,
-      {
-        headers: {
-          Accept: 'application/json',
-        },
-        cache: 'no-store',
-      }
-    );
+    // ==================================================
+    // SILVER 24H CHANGE
+    // ==================================================
 
     let silverChange = 0;
     let silverChangePercent = 0;
 
-    if (silverSpotRes.ok) {
-      const silverSpotData =
-        await silverSpotRes.json();
+    try {
+      const silverSpotUrl =
+        `https://api.metals.dev/v1/metal/spot?api_key=${encodeURIComponent(
+          API_KEY
+        )}&metal=silver&currency=USD`;
 
-      silverChange =
-        Number(
-          silverSpotData?.rate?.change
-        ) || 0;
+      const silverSpotRes = await fetch(
+        silverSpotUrl,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+          cache: 'no-store',
+        }
+      );
 
-      silverChangePercent =
-        Number(
-          silverSpotData?.rate?.change_percent
-        ) || 0;
+      if (silverSpotRes.ok) {
+        const silverSpotData =
+          await silverSpotRes.json();
+
+        silverChange =
+          Number(
+            silverSpotData?.rate?.change
+          ) || 0;
+
+        silverChangePercent =
+          Number(
+            silverSpotData?.rate?.change_percent
+          ) || 0;
+      }
+    } catch (silverError) {
+      console.error(
+        'Silver 24H change error:',
+        silverError
+      );
     }
 
-    // ------------------------------------------
-    // RETURN
-    // ------------------------------------------
+    // ==================================================
+    // FINAL RESPONSE
+    // ==================================================
 
     return res.status(200).json({
       success: true,
@@ -185,7 +249,8 @@ export default async function handler(req, res) {
         goldUsdOz,
         silverUsdOz,
         platinumUsdOz,
-        copperUsdMt,
+        copperUsdMt:
+          Number(copperUsdMt) || 0,
       },
 
       calculatedPkr: {
@@ -222,7 +287,9 @@ export default async function handler(req, res) {
 
     return res.status(500).json({
       success: false,
-      error: error.message,
+      error:
+        error?.message ||
+        'Unknown market rates API error',
     });
   }
 }
