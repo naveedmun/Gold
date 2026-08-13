@@ -1,116 +1,105 @@
-// api/market-rates.js
-
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
 
-  try {
-    // Vercel Environment Variable
-    const apiKey = process.env.METALS_API_KEY;
+  const API_KEY = process.env.METALS_API_KEY;
 
-    if (!apiKey) {
-      return res.status(500).json({
+  if (!API_KEY) {
+    return res.status(500).json({
+      success: false,
+      error: 'METALS_API_KEY is not configured on Vercel.'
+    });
+  }
+
+  try {
+    const metal = req.query?.metal || 'gold';
+    const startDate = req.query?.start_date;
+    const endDate = req.query?.end_date;
+
+    const allowedMetals = [
+      'gold',
+      'silver',
+      'platinum',
+      'copper'
+    ];
+
+    if (!allowedMetals.includes(metal)) {
+      return res.status(400).json({
         success: false,
-        error: 'METALS_API_KEY environment variable is missing.'
+        error: 'Invalid metal.'
       });
     }
 
-    // Metals.Dev - Live international metal prices
-    const metalsUrl =
-      `https://api.metals.dev/v1/latest?api_key=${encodeURIComponent(apiKey)}&currency=USD&unit=toz`;
+    // --------------------------------------------------
+    // HISTORICAL / TIMESERIES
+    // --------------------------------------------------
 
-    const metalsRes = await fetch(metalsUrl, {
+    if (startDate && endDate) {
+      const url =
+        `https://api.metals.dev/v1/timeseries` +
+        `?api_key=${encodeURIComponent(API_KEY)}` +
+        `&start_date=${encodeURIComponent(startDate)}` +
+        `&end_date=${encodeURIComponent(endDate)}`;
+
+      const response = await fetch(url, {
+        headers: {
+          Accept: 'application/json'
+        },
+        cache: 'no-store'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data?.status !== 'success') {
+        return res.status(502).json({
+          success: false,
+          error:
+            data?.error_message ||
+            'Historical metals data unavailable.'
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        type: 'timeseries',
+        metal,
+        data
+      });
+    }
+
+    // --------------------------------------------------
+    // LIVE RATES
+    // --------------------------------------------------
+
+    const url =
+      `https://api.metals.dev/v1/latest` +
+      `?api_key=${encodeURIComponent(API_KEY)}` +
+      `&currency=USD` +
+      `&unit=toz`;
+
+    const response = await fetch(url, {
       headers: {
         Accept: 'application/json'
       },
       cache: 'no-store'
     });
 
-    const metalsData = await metalsRes.json();
+    const data = await response.json();
 
-    if (!metalsRes.ok || metalsData.status !== 'success') {
+    if (!response.ok || data?.status !== 'success') {
       return res.status(502).json({
         success: false,
         error:
-          metalsData.error_message ||
-          'Metals.Dev API request failed.'
+          data?.error_message ||
+          'Live metals data unavailable.'
       });
     }
-
-    // Metals.Dev data
-    const goldPriceUsdPerOunce = Number(metalsData.metals?.gold || 0);
-    const silverPriceUsdPerOunce = Number(metalsData.metals?.silver || 0);
-    const platinumPriceUsdPerOunce = Number(metalsData.metals?.platinum || 0);
-
-    // IMPORTANT:
-    // Metals.Dev reports copper in its industrial-metal unit.
-    // We keep the returned value for reference.
-    const copperPrice = Number(metalsData.metals?.copper || 0);
-
-    // USD -> PKR
-    const pkrRes = await fetch(
-      'https://open.er-api.com/v6/latest/USD',
-      {
-        cache: 'no-store'
-      }
-    );
-
-    const pkrData = await pkrRes.json();
-    const usdPkr = Number(pkrData?.rates?.PKR || 0);
-
-    if (!usdPkr) {
-      return res.status(502).json({
-        success: false,
-        error: 'Unable to fetch USD/PKR exchange rate.'
-      });
-    }
-
-    // 1 Tola = 11.6638125 grams
-    // 1 Troy Ounce = 31.1034768 grams
-    const TOLA_IN_TROY_OUNCE =
-      11.6638125 / 31.1034768;
-
-    // Convert Troy Ounce USD -> Tola PKR
-    const goldTolaPkr =
-      goldPriceUsdPerOunce *
-      TOLA_IN_TROY_OUNCE *
-      usdPkr;
-
-    const silverTolaPkr =
-      silverPriceUsdPerOunce *
-      TOLA_IN_TROY_OUNCE *
-      usdPkr;
-
-    const platinumTolaPkr =
-      platinumPriceUsdPerOunce *
-      TOLA_IN_TROY_OUNCE *
-      usdPkr;
 
     return res.status(200).json({
       success: true,
-
-      source: 'Metals.Dev',
-
-      metals: {
-        gold: goldPriceUsdPerOunce,
-        silver: silverPriceUsdPerOunce,
-        platinum: platinumPriceUsdPerOunce,
-        copper: copperPrice
-      },
-
-      calculatedPkr: {
-        goldTola: goldTolaPkr,
-        silverTola: silverTolaPkr,
-        platinumTola: platinumTolaPkr
-      },
-
-      usdPkr,
-
-      timestamp:
-        metalsData.timestamp ||
-        new Date().toISOString()
+      type: 'latest',
+      data
     });
 
   } catch (error) {
@@ -118,7 +107,7 @@ export default async function handler(req, res) {
 
     return res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch market rates.'
+      error: error.message || 'Server error'
     });
   }
 }
