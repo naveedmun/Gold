@@ -183,46 +183,67 @@ export default function Home() {
   // FETCH LIVE RATES
   // --------------------------------------------------
 
-  const fetchLiveRates =
-    useCallback(async () => {
+  const fetchLiveRates = useCallback(async () => {
+  setLoading(true);
+  setError('');
 
-      setLoading(true);
-      setError('');
+  try {
+    const response = await fetch(
+      '/api/market-rates',
+      {
+        cache: 'no-store',
+      }
+    );
 
-      try {
+    const data = await response.json();
 
-        // USD / PKR
-        const pkrResponse =
-          await fetch(
-            'https://open.er-api.com/v6/latest/USD',
-            {
-              cache: 'no-store'
-            }
-          );
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data?.error ||
+        'Live market rates unavailable'
+      );
+    }
 
-        if (!pkrResponse.ok) {
-          throw new Error(
-            'USD/PKR API failed'
-          );
-        }
+    setRates({
+      goldTola: Number(
+        data.calculatedPkr.goldTola
+      ),
 
-        const pkrData =
-          await pkrResponse.json();
+      silverTola: Number(
+        data.calculatedPkr.silverTola
+      ),
 
-        const usdPkr =
-          Number(
-            pkrData?.rates?.PKR
-          );
+      platinumTola: Number(
+        data.calculatedPkr.platinumTola
+      ),
 
-        if (
-          !usdPkr ||
-          usdPkr <= 0
-        ) {
-          throw new Error(
-            'USD/PKR unavailable'
-          );
-        }
+      // Copper temporarily 0
+      // Isko next step mein proper Metals.Dev
+      // industrial-metal calculation se connect karenge.
+      copperTola: 0,
 
+      usdPkr: Number(data.usdPkr),
+    });
+
+    setLastUpdated(
+      data.timestamp
+        ? new Date(data.timestamp)
+        : new Date()
+    );
+
+  } catch (err) {
+    console.error(
+      'Failed to fetch live rates:',
+      err
+    );
+
+    setError(
+      'Live rate fetch karne mein masla aa raha hai. Please refresh karein.'
+    );
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
         // Metals.Dev
         const response =
