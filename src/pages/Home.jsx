@@ -2,7 +2,6 @@ import React, {
   useState,
   useEffect,
   useCallback,
-  useMemo
 } from 'react';
 
 import { useOutletContext } from 'react-router-dom';
@@ -10,66 +9,13 @@ import { useOutletContext } from 'react-router-dom';
 import {
   RefreshCw,
   TrendingUp,
-  AlertCircle
+  TrendingDown,
+  AlertCircle,
+  Coins,
+  CircleDollarSign,
+  Gem,
+  Activity,
 } from 'lucide-react';
-
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip
-} from 'recharts';
-
-
-const TOLA_IN_TROY_OUNCE =
-  11.6638125 / 31.1034768;
-
-
-// --------------------------------------------------
-// RANGE DAYS
-// --------------------------------------------------
-
-const RANGE_DAYS = {
-  '5D': 5,
-  '1M': 30,
-  '3M': 90,
-  '6M': 180,
-  '1Y': 365
-};
-
-
-// --------------------------------------------------
-// DATE HELPERS
-// --------------------------------------------------
-
-function formatDate(date) {
-  return date.toISOString().split('T')[0];
-}
-
-function getStartDate(days) {
-  const date = new Date();
-
-  date.setDate(
-    date.getDate() - days
-  );
-
-  return formatDate(date);
-}
-
-function formatChartDate(dateString) {
-  const date = new Date(dateString);
-
-  return date.toLocaleDateString(
-    'en-US',
-    {
-      month: 'short',
-      day: 'numeric'
-    }
-  );
-}
 
 
 // --------------------------------------------------
@@ -95,28 +41,26 @@ export default function Home() {
       silverTola: 0,
       platinumTola: 0,
       copperTola: 0,
-      usdPkr: 0
+      usdPkr: 0,
     });
 
 
   // --------------------------------------------------
-  // CHART STATE
+  // CHANGES
   // --------------------------------------------------
 
-  const [selectedMetal, setSelectedMetal] =
-    useState('gold');
+  const [changes, setChanges] =
+    useState({
+      gold: {
+        usd: 0,
+        percent: 0,
+      },
 
-  const [selectedRange, setSelectedRange] =
-    useState('1D');
-
-  const [chartData, setChartData] =
-    useState([]);
-
-  const [liveHistory, setLiveHistory] =
-    useState([]);
-
-  const [chartLoading, setChartLoading] =
-    useState(true);
+      silver: {
+        usd: 0,
+        percent: 0,
+      },
+    });
 
 
   // --------------------------------------------------
@@ -153,6 +97,7 @@ export default function Home() {
         currency === 'USD' &&
         rates.usdPkr > 0
       ) {
+
         return `$ ${(
           amount /
           rates.usdPkr
@@ -160,9 +105,10 @@ export default function Home() {
           'en-US',
           {
             minimumFractionDigits: 2,
-            maximumFractionDigits: 2
+            maximumFractionDigits: 2,
           }
         )}`;
+
       }
 
       return `Rs ${Math.round(
@@ -170,11 +116,12 @@ export default function Home() {
       ).toLocaleString(
         'en-PK'
       )}`;
+
     },
     [
       currency,
       rates.usdPkr,
-      loading
+      loading,
     ]
   );
 
@@ -183,77 +130,151 @@ export default function Home() {
   // FETCH LIVE RATES
   // --------------------------------------------------
 
-  const fetchLiveRates = useCallback(async () => {
-  setLoading(true);
-  setError('');
+  const fetchLiveRates =
+    useCallback(
+      async () => {
 
-  try {
-    const response = await fetch(
-      '/api/market-rates',
-      {
-        cache: 'no-store',
-      }
+        setLoading(true);
+        setError('');
+
+        try {
+
+          const response =
+            await fetch(
+              '/api/market-rates',
+              {
+                cache: 'no-store',
+              }
+            );
+
+
+          const data =
+            await response.json();
+
+
+          if (
+            !response.ok ||
+            !data.success
+          ) {
+
+            throw new Error(
+              data?.error ||
+              'Live market rates unavailable'
+            );
+
+          }
+
+
+          // ------------------------------------------
+          // RATES
+          // ------------------------------------------
+
+          setRates({
+
+            goldTola:
+              Number(
+                data?.calculatedPkr?.goldTola
+              ) || 0,
+
+            silverTola:
+              Number(
+                data?.calculatedPkr?.silverTola
+              ) || 0,
+
+            platinumTola:
+              Number(
+                data?.calculatedPkr?.platinumTola
+              ) || 0,
+
+            copperTola:
+              Number(
+                data?.calculatedPkr?.copperTola
+              ) || 0,
+
+            usdPkr:
+              Number(
+                data?.usdPkr
+              ) || 0,
+
+          });
+
+
+          // ------------------------------------------
+          // DAILY CHANGE
+          // ------------------------------------------
+
+          setChanges({
+
+            gold: {
+              usd:
+                Number(
+                  data?.changes?.gold?.usd
+                ) || 0,
+
+              percent:
+                Number(
+                  data?.changes?.gold?.percent
+                ) || 0,
+            },
+
+            silver: {
+              usd:
+                Number(
+                  data?.changes?.silver?.usd
+                ) || 0,
+
+              percent:
+                Number(
+                  data?.changes?.silver?.percent
+                ) || 0,
+            },
+
+          });
+
+
+          // ------------------------------------------
+          // LAST UPDATED
+          // ------------------------------------------
+
+          setLastUpdated(
+            data?.timestamp
+              ? new Date(
+                  data.timestamp
+                )
+              : new Date()
+          );
+
+
+        } catch (err) {
+
+          console.error(
+            'Failed to fetch live rates:',
+            err
+          );
+
+          setError(
+            'Live rate fetch karne mein masla aa raha hai. Please refresh karein.'
+          );
+
+        } finally {
+
+          setLoading(false);
+
+        }
+
+      },
+      []
     );
 
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(
-        data?.error ||
-        'Live market rates unavailable'
-      );
-    }
-
-    setRates({
-      goldTola: Number(
-        data.calculatedPkr.goldTola
-      ),
-
-      silverTola: Number(
-        data.calculatedPkr.silverTola
-      ),
-
-      platinumTola: Number(
-        data.calculatedPkr.platinumTola
-      ),
-
-      // Copper temporarily 0
-      // Isko next step mein proper Metals.Dev
-      // industrial-metal calculation se connect karenge.
-      copperTola: 0,
-
-      usdPkr: Number(data.usdPkr),
-    });
-
-    setLastUpdated(
-      data.timestamp
-        ? new Date(data.timestamp)
-        : new Date()
-    );
-
-  } catch (err) {
-    console.error(
-      'Failed to fetch live rates:',
-      err
-    );
-
-    setError(
-      'Live rate fetch karne mein masla aa raha hai. Please refresh karein.'
-    );
-  } finally {
-    setLoading(false);
-  }
-}, []);
-
-      
 
   // --------------------------------------------------
-  // INITIAL LIVE LOAD
+  // INITIAL LOAD
   // --------------------------------------------------
 
   useEffect(() => {
 
     fetchLiveRates();
+
 
     const interval =
       setInterval(
@@ -261,265 +282,321 @@ export default function Home() {
         60 * 1000
       );
 
+
     return () =>
       clearInterval(
         interval
       );
 
   }, [
-    fetchLiveRates
+    fetchLiveRates,
   ]);
 
 
   // --------------------------------------------------
-  // FETCH HISTORICAL DATA
+  // CHANGE CALCULATION
   // --------------------------------------------------
 
-  const fetchHistoricalData =
-    useCallback(async () => {
+  const getChangeData =
+    (metal) => {
+
+      const percent =
+        Number(
+          changes?.[metal]?.percent
+        ) || 0;
+
+
+      const usdChange =
+        Number(
+          changes?.[metal]?.usd
+        ) || 0;
+
+
+      const isPositive =
+        percent > 0;
+
+
+      const isNegative =
+        percent < 0;
+
+
+      const changePkr =
+        rates.usdPkr > 0
+          ? usdChange *
+            rates.usdPkr *
+            (
+              11.6638125 /
+              31.1034768
+            )
+          : 0;
+
+
+      return {
+        percent,
+        usdChange,
+        changePkr,
+        isPositive,
+        isNegative,
+      };
+
+    };
+
+
+  // --------------------------------------------------
+  // CHANGE COMPONENT
+  // --------------------------------------------------
+
+  const ChangeBadge =
+    ({
+      metal,
+      showAmount = true,
+    }) => {
+
+      const change =
+        getChangeData(
+          metal
+        );
+
 
       if (
-        selectedRange === '1D'
+        !change.percent &&
+        !change.changePkr
       ) {
 
-        setChartData(
-          liveHistory.map(
-            item => ({
-              time:
-                item.time,
+        return (
 
-              price:
-                selectedMetal === 'gold'
-                  ? item.gold
-                  : item.silver
-            })
-          )
+          <div className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+
+            <Activity
+              className="h-3 w-3"
+            />
+
+            No change data
+
+          </div>
+
         );
 
-        setChartLoading(false);
-
-        return;
       }
 
 
-      setChartLoading(true);
+      const positive =
+        change.isPositive;
 
 
-      try {
-
-        const days =
-          RANGE_DAYS[
-            selectedRange
-          ];
+      const negative =
+        change.isNegative;
 
 
-        const startDate =
-          getStartDate(days);
+      return (
 
-        const endDate =
-          formatDate(
-            new Date()
-          );
+        <div
+          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold ${
+            positive
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+              : negative
+                ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                : 'bg-muted text-muted-foreground'
+          }`}
+        >
 
+          {positive ? (
 
-        const response =
-          await fetch(
-            `/api/market-rates?metal=${selectedMetal}&start_date=${startDate}&end_date=${endDate}`,
-            {
-              cache: 'no-store'
-            }
-          );
+            <TrendingUp
+              className="h-3.5 w-3.5"
+            />
 
+          ) : negative ? (
 
-        if (!response.ok) {
-          throw new Error(
-            'Historical API failed'
-          );
-        }
+            <TrendingDown
+              className="h-3.5 w-3.5"
+            />
 
+          ) : (
 
-        const result =
-          await response.json();
+            <Activity
+              className="h-3.5 w-3.5"
+            />
 
-
-        if (
-          !result.success
-        ) {
-          throw new Error(
-            result.error ||
-            'Historical data unavailable'
-          );
-        }
+          )}
 
 
-        const ratesData =
-          result.data?.rates || {};
+          {showAmount &&
+            change.changePkr !== 0 && (
+              <span>
+                {positive
+                  ? '+'
+                  : '-'}
+                Rs{' '}
+                {Math.abs(
+                  Math.round(
+                    change.changePkr
+                  )
+                ).toLocaleString(
+                  'en-PK'
+                )}
+              </span>
+            )}
 
 
-        const points =
-          Object.entries(
-            ratesData
-          )
-          .map(
-            ([date, item]) => {
+          <span>
+            ({positive
+              ? '+'
+              : ''}
+            {change.percent.toFixed(
+              2
+            )}
+            %)
+          </span>
 
-              const usdPrice =
-                Number(
-                  item?.metals?.[
-                    selectedMetal
-                  ]
-                );
+        </div>
 
-
-              if (
-                !usdPrice ||
-                usdPrice <= 0
-              ) {
-                return null;
-              }
-
-
-              const price =
-                currency === 'USD'
-                  ? usdPrice *
-                    TOLA_IN_TROY_OUNCE
-                  : usdPrice *
-                    TOLA_IN_TROY_OUNCE *
-                    rates.usdPkr;
-
-
-              return {
-                time:
-                  formatChartDate(
-                    date
-                  ),
-
-                date,
-
-                price
-              };
-
-            }
-          )
-          .filter(Boolean);
-
-
-        setChartData(
-          points
-        );
-
-      } catch (err) {
-
-        console.error(
-          'Historical chart error:',
-          err
-        );
-
-        setChartData([]);
-
-      } finally {
-
-        setChartLoading(false);
-
-      }
-
-    }, [
-      selectedRange,
-      selectedMetal,
-      currency,
-      rates.usdPkr,
-      liveHistory
-    ]);
-
-
-  // --------------------------------------------------
-  // RUN CHART FETCH
-  // --------------------------------------------------
-
-  useEffect(() => {
-
-    if (
-      selectedRange === '1D'
-    ) {
-
-      setChartData(
-        liveHistory.map(
-          item => ({
-            time:
-              item.time,
-
-            price:
-              selectedMetal === 'gold'
-                ? item.gold
-                : item.silver
-          })
-        )
       );
 
-      setChartLoading(false);
-
-      return;
-    }
-
-
-    if (
-      rates.usdPkr > 0
-    ) {
-      fetchHistoricalData();
-    }
-
-  }, [
-    selectedRange,
-    selectedMetal,
-    currency,
-    rates.usdPkr,
-    liveHistory,
-    fetchHistoricalData
-  ]);
+    };
 
 
   // --------------------------------------------------
-  // CURRENT PRICE
+  // METAL CARD
   // --------------------------------------------------
 
-  const currentChartPrice =
-    selectedMetal === 'gold'
-      ? rates.goldTola
-      : rates.silverTola;
+  const MetalCard =
+    ({
+      title,
+      subtitle,
+      amount,
+      icon: Icon,
+      iconClass,
+      cardClass,
+      metal,
+      badge,
+    }) => (
+
+      <div
+        className={`relative overflow-hidden rounded-2xl border bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${cardClass}`}
+      >
+
+        {/* Decorative Circle */}
+
+        <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-current opacity-[0.035]" />
 
 
-  const chartDisplayPrice =
-    currency === 'USD' &&
-    rates.usdPkr > 0
-      ? currentChartPrice /
-        rates.usdPkr
-      : currentChartPrice;
+        {/* Header */}
+
+        <div className="relative flex items-start justify-between">
+
+          <div className="flex items-center gap-3">
+
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}
+            >
+
+              <Icon
+                className="h-5 w-5"
+              />
+
+            </div>
 
 
-  // --------------------------------------------------
-  // CHART COLOR
-  // --------------------------------------------------
+            <div>
 
-  const chartColor =
-    selectedMetal === 'gold'
-      ? '#D4AF37'
-      : '#94A3B8';
+              <p className="text-sm font-bold text-foreground">
+
+                {title}
+
+              </p>
+
+              <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+
+                {subtitle}
+
+              </p>
+
+            </div>
+
+          </div>
 
 
-  const gradientId =
-    selectedMetal === 'gold'
-      ? 'goldChartGradient'
-      : 'silverChartGradient';
+          {badge && (
+
+            <span className="rounded-full bg-muted px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+
+              {badge}
+
+            </span>
+
+          )}
+
+        </div>
 
 
-  // --------------------------------------------------
-  // CHART TITLE
-  // --------------------------------------------------
+        {/* Price */}
 
-  const chartTitle =
-    currency === 'USD'
-      ? 'Global Market Price'
-      : 'Pakistani Sarafa Rate';
+        <div className="relative mt-5">
+
+          <p className="text-3xl font-extrabold tracking-tight text-foreground">
+
+            {formatMoney(
+              amount
+            )}
+
+          </p>
+
+          <p className="mt-1 text-[10px] font-medium text-muted-foreground">
+
+            Per Tola
+
+          </p>
+
+        </div>
+
+
+        {/* Change */}
+
+        <div className="relative mt-4 flex items-center justify-between">
+
+          <div>
+
+            <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+
+              24H Change
+
+            </p>
+
+            <ChangeBadge
+              metal={metal}
+            />
+
+          </div>
+
+
+          <div className="text-right">
+
+            <p className="text-[9px] font-medium text-muted-foreground">
+
+              Market Status
+
+            </p>
+
+            <div className="mt-1 flex items-center justify-end gap-1.5">
+
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+
+                Live
+
+              </span>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    );
 
 
   // --------------------------------------------------
@@ -528,80 +605,113 @@ export default function Home() {
 
   return (
 
-    <div className="space-y-4 max-w-xl mx-auto pb-10">
+    <div className="mx-auto max-w-xl space-y-4 pb-10">
 
-      {/* ================================================
-          HEADER
-      ================================================= */}
 
-      <div className="flex items-center justify-between bg-card border border-border p-4 rounded-2xl shadow-sm">
+      {/* ==========================================
+          LIVE HEADER
+      ========================================== */}
 
-        <div className="flex items-center gap-3">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
 
-          <span className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+        <div className="flex items-center justify-between">
 
-          <div>
+          <div className="flex items-center gap-3">
 
-            <h1 className="font-bold text-sm text-foreground">
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
 
-              {currency === 'USD'
-                ? 'Global Market Rates (Live)'
-                : 'Pakistani Sarafa Rates (Live)'}
+              <span className="absolute h-3 w-3 animate-ping rounded-full bg-emerald-500 opacity-40" />
 
-            </h1>
+              <span className="relative h-2.5 w-2.5 rounded-full bg-emerald-500" />
 
-            <p className="text-[11px] text-muted-foreground mt-0.5">
+            </div>
 
-              Updated:{' '}
 
-              {lastUpdated
-                ? lastUpdated.toLocaleTimeString()
-                : 'Fetching...'}
+            <div>
 
-              {' | '}
+              <h1 className="text-sm font-extrabold text-foreground">
 
-              USD/PKR: Rs{' '}
+                {currency === 'USD'
+                  ? 'Global Market Rates'
+                  : 'Pakistani Sarafa Rates'}
 
-              {rates.usdPkr
-                ? rates.usdPkr.toFixed(2)
-                : '---'}
+              </h1>
 
-            </p>
+
+              <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">
+
+                Live market data • Updated{' '}
+
+                {lastUpdated
+                  ? lastUpdated.toLocaleTimeString()
+                  : 'Fetching...'}
+
+              </p>
+
+            </div>
 
           </div>
+
+
+          <button
+            onClick={
+              fetchLiveRates
+            }
+            disabled={
+              loading
+            }
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/60 transition hover:bg-muted disabled:opacity-60"
+            title="Refresh Rates"
+          >
+
+            <RefreshCw
+              className={`h-4 w-4 text-foreground ${
+                loading
+                  ? 'animate-spin'
+                  : ''
+              }`}
+            />
+
+          </button>
 
         </div>
 
 
-        <button
-          onClick={fetchLiveRates}
-          disabled={loading}
-          className="p-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
-          title="Refresh Rates"
-        >
+        {/* USD PKR */}
 
-          <RefreshCw
-            className={`h-4 w-4 text-muted-foreground ${
-              loading
-                ? 'animate-spin'
-                : ''
-            }`}
-          />
+        <div className="mt-3 flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5">
 
-        </button>
+          <span className="text-[10px] font-semibold text-muted-foreground">
+
+            USD / PKR
+
+          </span>
+
+
+          <span className="text-xs font-extrabold text-foreground">
+
+            {rates.usdPkr > 0
+              ? `Rs ${rates.usdPkr.toFixed(2)}`
+              : '---'}
+
+          </span>
+
+        </div>
 
       </div>
 
 
-      {/* ================================================
+      {/* ==========================================
           ERROR
-      ================================================= */}
+      ========================================== */}
 
       {error && (
 
-        <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 flex items-center gap-2 text-xs text-red-600">
+        <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs font-medium text-red-600 dark:text-red-400">
 
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <AlertCircle
+            className="h-4 w-4 flex-shrink-0"
+          />
 
           <span>
             {error}
@@ -612,563 +722,220 @@ export default function Home() {
       )}
 
 
-      {/* ================================================
-          MAIN CHART
-      ================================================= */}
+      {/* ==========================================
+          MARKET SUMMARY
+      ========================================== */}
 
-      <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
 
-
-        {/* Chart Header */}
-
-        <div className="p-4 pb-2">
-
-          <div className="flex items-start justify-between">
-
-            <div>
-
-              <p className="text-xs text-muted-foreground">
-
-                {selectedMetal === 'gold'
-                  ? 'Gold'
-                  : 'Silver'}
-
-                {' '}
-
-                {chartTitle}
-
-              </p>
-
-              <p className="text-2xl font-extrabold text-foreground mt-1">
-
-                {formatMoney(
-                  currentChartPrice
-                )}
-
-              </p>
-
-              <p className="text-[10px] text-muted-foreground mt-1">
-
-                Per Tola
-
-              </p>
-
-            </div>
-
-
-            <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
-
-              <TrendingUp className="h-4 w-4" />
-
-              Live
-
-            </div>
-
-          </div>
-
-        </div>
-
-
-        {/* Metal Buttons */}
-
-        <div className="px-4 pt-2">
-
-          <div className="flex gap-2">
-
-            <button
-              onClick={() =>
-                setSelectedMetal('gold')
-              }
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-                selectedMetal === 'gold'
-                  ? 'bg-[#D4AF37] text-white shadow-sm'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              Gold
-            </button>
-
-
-            <button
-              onClick={() =>
-                setSelectedMetal('silver')
-              }
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-                selectedMetal === 'silver'
-                  ? 'bg-slate-500 text-white shadow-sm'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              Silver
-            </button>
-
-          </div>
-
-        </div>
-
-
-        {/* Range Buttons */}
-
-        <div className="px-4 pt-3">
-
-          <div className="flex items-center gap-1 overflow-x-auto">
-
-            {[
-              '1D',
-              '5D',
-              '1M',
-              '3M',
-              '6M',
-              '1Y'
-            ].map(
-              range => (
-
-                <button
-                  key={range}
-                  onClick={() =>
-                    setSelectedRange(
-                      range
-                    )
-                  }
-                  className={`px-3 py-1.5 rounded-md text-[11px] font-semibold whitespace-nowrap transition ${
-                    selectedRange === range
-                      ? 'bg-foreground text-background shadow-sm'
-                      : 'text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-
-                  {range}
-
-                </button>
-
-              )
-            )}
-
-          </div>
-
-        </div>
-
-
-        {/* ================================================
-            GRAPH
-        ================================================= */}
-
-        <div className="h-[310px] w-full px-2 pt-4 pb-2">
-
-          {chartLoading ? (
-
-            <div className="h-full flex flex-col items-center justify-center gap-2">
-
-              <RefreshCw
-                className="h-6 w-6 animate-spin"
-                style={{
-                  color: chartColor
-                }}
-              />
-
-              <span className="text-xs text-muted-foreground">
-                Loading market history...
-              </span>
-
-            </div>
-
-          ) : chartData.length >= 2 ? (
-
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-            >
-
-              <AreaChart
-                data={chartData}
-                margin={{
-                  top: 10,
-                  right: 12,
-                  left: 5,
-                  bottom: 5
-                }}
-              >
-
-                <defs>
-
-                  <linearGradient
-                    id={gradientId}
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-
-                    <stop
-                      offset="0%"
-                      stopColor={chartColor}
-                      stopOpacity={0.32}
-                    />
-
-                    <stop
-                      offset="100%"
-                      stopColor={chartColor}
-                      stopOpacity={0.02}
-                    />
-
-                  </linearGradient>
-
-                </defs>
-
-
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  className="stroke-border"
-                  opacity={0.45}
-                />
-
-
-                <XAxis
-                  dataKey="time"
-                  tick={{
-                    fontSize: 10
-                  }}
-                  tickLine={false}
-                  axisLine={false}
-                  minTickGap={25}
-                />
-
-
-                <YAxis
-                  domain={[
-                    'dataMin',
-                    'dataMax'
-                  ]}
-                  tick={{
-                    fontSize: 10
-                  }}
-                  tickLine={false}
-                  axisLine={false}
-                  width={62}
-                  tickFormatter={
-                    value =>
-                      currency === 'USD'
-                        ? `$${Math.round(
-                            value
-                          ).toLocaleString()}`
-                        : `Rs ${Math.round(
-                            value / 1000
-                          )}k`
-                  }
-                />
-
-
-                <Tooltip
-                  cursor={{
-                    stroke: chartColor,
-                    strokeDasharray: '4 4'
-                  }}
-                  formatter={
-                    value => [
-
-                      currency === 'USD'
-                        ? `$ ${Number(
-                            value
-                          ).toLocaleString(
-                            'en-US',
-                            {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2
-                            }
-                          )}
-                        `
-                        : `Rs ${Math.round(
-                            value
-                          ).toLocaleString(
-                            'en-PK'
-                          )}`,
-
-                      selectedMetal === 'gold'
-                        ? 'Gold'
-                        : 'Silver'
-
-                    ]
-                  }
-                  contentStyle={{
-                    borderRadius:
-                      '12px',
-
-                    border:
-                      `1px solid ${chartColor}`,
-
-                    background:
-                      'var(--card)',
-
-                    boxShadow:
-                      '0 8px 25px rgba(0,0,0,0.12)',
-
-                    fontSize:
-                      '12px'
-                  }}
-                />
-
-
-                <Area
-                  type="monotone"
-                  dataKey="price"
-                  stroke={chartColor}
-                  strokeWidth={3}
-                  fill={`url(#${gradientId})`}
-                  fillOpacity={1}
-                  dot={false}
-                  activeDot={{
-                    r: 5,
-                    strokeWidth: 2
-                  }}
-                  animationDuration={700}
-                />
-
-              </AreaChart>
-
-            </ResponsiveContainer>
-
-          ) : chartData.length === 1 ? (
-
-            <div className="h-full flex flex-col items-center justify-center">
-
-              <div
-                className="h-3 w-3 rounded-full mb-3"
-                style={{
-                  backgroundColor:
-                    chartColor,
-                  boxShadow:
-                    `0 0 0 6px ${chartColor}20`
-                }}
-              />
-
-              <p className="text-xs font-medium text-foreground">
-                Live price received
-              </p>
-
-              <p className="text-[10px] text-muted-foreground mt-1 text-center px-6">
-                More live points will appear on the 1D chart automatically.
-              </p>
-
-            </div>
-
-          ) : (
-
-            <div className="h-full flex items-center justify-center">
-
-              <p className="text-xs text-muted-foreground">
-                Historical chart data unavailable
-              </p>
-
-            </div>
-
-          )}
-
-        </div>
-
-
-        {/* ================================================
-            CHART FOOTER
-        ================================================= */}
-
-        <div className="border-t border-border px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center justify-between">
 
           <div>
 
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
 
-              Current Price
-
-            </p>
-
-            <p className="text-sm font-bold">
-
-              {currency === 'USD'
-                ? `$ ${chartDisplayPrice.toLocaleString(
-                    'en-US',
-                    {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    }
-                  )}`
-                : `Rs ${Math.round(
-                    chartDisplayPrice
-                  ).toLocaleString(
-                    'en-PK'
-                  )}`}
+              Market Overview
 
             </p>
+
+            <h2 className="mt-1 text-lg font-extrabold text-foreground">
+
+              Precious Metals
+
+            </h2>
 
           </div>
 
 
-          <div className="text-right">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#D4AF37]/10">
 
-            <p className="text-[10px] text-muted-foreground">
-              Per Tola
-            </p>
-
-            <p className="text-xs font-semibold text-emerald-600">
-              Live Market
-            </p>
+            <Coins
+              className="h-5 w-5 text-[#D4AF37]"
+            />
 
           </div>
 
         </div>
 
-      </div>
 
+        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
 
-      {/* ================================================
-          GOLD CARD
-      ================================================= */}
-
-      <div className="rounded-2xl border border-[#D4AF37]/50 bg-gradient-to-br from-[#D4AF37]/20 via-card to-card p-5 shadow-sm space-y-2">
-
-        <div className="flex justify-between items-center">
-
-          <span className="text-xs font-bold uppercase tracking-wider text-[#B8860B]">
-
-            Gold Rate (24K - 1 Tola)
-
-          </span>
-
-
-          <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-[#D4AF37]/30 text-[#B8860B]">
-
-            24 KARAT
-
-          </span>
-
-        </div>
-
-
-        <div className="flex items-baseline justify-between pt-1">
-
-          <div>
-
-            <p className="text-3xl font-extrabold text-foreground tracking-tight">
-
-              {formatMoney(
-                rates.goldTola
-              )}
-
-            </p>
-
-
-            {rates.usdPkr > 0 &&
-              rates.goldTola > 0 && (
-
-                <p className="text-xs font-medium text-muted-foreground mt-1">
-
-                  (~ $
-                  {Math.round(
-                    rates.goldTola /
-                    rates.usdPkr
-                  )}{' '}
-                  USD per Tola)
-
-                </p>
-
-              )}
-
-          </div>
-
-
-          <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-
-            <TrendingUp className="h-4 w-4" />
-
-            Live Market
-
-          </span>
-
-        </div>
-
-      </div>
-
-
-      {/* ================================================
-          SILVER CARD
-      ================================================= */}
-
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-1">
-
-        <div className="flex justify-between items-center">
-
-          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-
-            Silver Rate (1 Tola)
-
-          </span>
-
-
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-
-            SILVER
-
-          </span>
-
-        </div>
-
-
-        <p className="text-2xl font-bold text-foreground">
-
-          {formatMoney(
-            rates.silverTola
-          )}
+          Live metal prices with 24-hour market movement.
 
         </p>
 
       </div>
 
 
-      {/* ================================================
-          PLATINUM + COPPER
-      ================================================= */}
+      {/* ==========================================
+          GOLD
+      ========================================== */}
 
-      <div className="grid grid-cols-2 gap-3">
+      <MetalCard
 
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-1">
+        title="Gold"
 
-          <span className="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
+        subtitle="24K • 1 Tola"
 
-            Platinum (1 Tola)
+        amount={
+          rates.goldTola
+        }
 
-          </span>
+        icon={Coins}
 
+        iconClass="bg-[#D4AF37]/15 text-[#B8860B]"
 
-          <p className="text-xl font-bold text-foreground">
+        cardClass="border-[#D4AF37]/40"
 
-            {formatMoney(
-              rates.platinumTola
-            )}
+        metal="gold"
 
-          </p>
+        badge="24 KARAT"
 
-        </div>
-
-
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-1">
-
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-500">
-
-            Copper (1 Tola)
-
-          </span>
+      />
 
 
-          <p className="text-xl font-bold text-foreground">
+      {/* ==========================================
+          SILVER
+      ========================================== */}
 
-            {formatMoney(
-              rates.copperTola
-            )}
+      <MetalCard
 
-          </p>
+        title="Silver"
+
+        subtitle="Pure Silver • 1 Tola"
+
+        amount={
+          rates.silverTola
+        }
+
+        icon={CircleDollarSign}
+
+        iconClass="bg-slate-500/10 text-slate-500"
+
+        cardClass="border-slate-300/60 dark:border-slate-700"
+
+        metal="silver"
+
+        badge="SILVER"
+
+      />
+
+
+      {/* ==========================================
+          PLATINUM
+      ========================================== */}
+
+      <MetalCard
+
+        title="Platinum"
+
+        subtitle="1 Tola"
+
+        amount={
+          rates.platinumTola
+        }
+
+        icon={Gem}
+
+        iconClass="bg-teal-500/10 text-teal-600 dark:text-teal-400"
+
+        cardClass="border-teal-500/20"
+
+        badge="PLATINUM"
+
+        metal="gold"
+
+      />
+
+
+      {/* ==========================================
+          COPPER
+      ========================================== */}
+
+      <MetalCard
+
+        title="Copper"
+
+        subtitle="1 Tola"
+
+        amount={
+          rates.copperTola
+        }
+
+        icon={Activity}
+
+        iconClass="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+
+        cardClass="border-amber-500/20"
+
+        badge="COPPER"
+
+        metal="silver"
+
+      />
+
+
+      {/* ==========================================
+          MARKET FOOTER
+      ========================================== */}
+
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+
+        <div className="flex items-center justify-between">
+
+          <div className="flex items-center gap-2">
+
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
+
+              <Activity
+                className="h-4 w-4 text-emerald-600"
+              />
+
+            </div>
+
+
+            <div>
+
+              <p className="text-xs font-bold text-foreground">
+
+                Live Market
+
+              </p>
+
+              <p className="text-[10px] text-muted-foreground">
+
+                Rates refresh automatically
+
+              </p>
+
+            </div>
+
+          </div>
+
+
+          <div className="text-right">
+
+            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+
+              Next Update
+
+            </p>
+
+            <p className="mt-0.5 text-[10px] font-bold text-foreground">
+
+              Within 60 sec
+
+            </p>
+
+          </div>
 
         </div>
 
       </div>
 
+
     </div>
+
   );
+
 }

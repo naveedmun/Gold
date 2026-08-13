@@ -12,47 +12,54 @@ export default async function handler(req, res) {
       throw new Error('METALS_API_KEY is not configured');
     }
 
-    // Metals.Dev - Live Precious Metals
-    const metalsUrl =
+    const TOLA_IN_TROY_OUNCE =
+      11.6638125 / 31.1034768;
+
+    // ------------------------------------------
+    // LIVE LATEST RATES
+    // ------------------------------------------
+
+    const latestUrl =
       `https://api.metals.dev/v1/latest?api_key=${API_KEY}&currency=USD&unit=toz`;
 
-    const metalsRes = await fetch(metalsUrl, {
+    const latestRes = await fetch(latestUrl, {
       headers: {
         Accept: 'application/json',
       },
       cache: 'no-store',
     });
 
-    if (!metalsRes.ok) {
+    if (!latestRes.ok) {
       throw new Error(
-        `Metals.Dev API failed: ${metalsRes.status}`
+        `Metals.Dev Latest API failed: ${latestRes.status}`
       );
     }
 
-    const metalsData = await metalsRes.json();
+    const latestData = await latestRes.json();
 
-    if (metalsData?.status !== 'success') {
+    if (latestData?.status !== 'success') {
       throw new Error(
-        metalsData?.error?.message ||
-        'Metals.Dev returned an error'
+        latestData?.error?.message ||
+        'Metals.Dev latest data unavailable'
       );
     }
 
-    const goldUsdOz = Number(metalsData?.metals?.gold);
-    const silverUsdOz = Number(metalsData?.metals?.silver);
-    const platinumUsdOz = Number(metalsData?.metals?.platinum);
+    const goldUsdOz =
+      Number(latestData?.metals?.gold);
 
-    if (
-      !goldUsdOz ||
-      !silverUsdOz ||
-      !platinumUsdOz
-    ) {
-      throw new Error(
-        'Gold/Silver/Platinum data unavailable'
-      );
-    }
+    const silverUsdOz =
+      Number(latestData?.metals?.silver);
 
-    // USD → PKR
+    const platinumUsdOz =
+      Number(latestData?.metals?.platinum);
+
+    const copperUsdMt =
+      Number(latestData?.metals?.copper);
+
+    // ------------------------------------------
+    // USD / PKR
+    // ------------------------------------------
+
     const pkrRes = await fetch(
       'https://open.er-api.com/v6/latest/USD',
       {
@@ -66,20 +73,17 @@ export default async function handler(req, res) {
 
     const pkrData = await pkrRes.json();
 
-    const usdPkr = Number(
-      pkrData?.rates?.PKR
-    );
+    const usdPkr =
+      Number(pkrData?.rates?.PKR);
 
     if (!usdPkr || usdPkr <= 0) {
       throw new Error('USD/PKR rate unavailable');
     }
 
-    // 1 Tola = 11.6638125g
-    // 1 Troy Ounce = 31.1034768g
-    const TOLA_IN_TROY_OUNCE =
-      11.6638125 / 31.1034768;
+    // ------------------------------------------
+    // PKR PER TOLA
+    // ------------------------------------------
 
-    // Per Tola in PKR
     const goldTolaPkr =
       goldUsdOz *
       TOLA_IN_TROY_OUNCE *
@@ -95,6 +99,85 @@ export default async function handler(req, res) {
       TOLA_IN_TROY_OUNCE *
       usdPkr;
 
+    const copperTolaPkr =
+      copperUsdMt *
+      TOLA_IN_TROY_OUNCE *
+      usdPkr;
+
+    // ------------------------------------------
+    // GOLD SPOT / CHANGE
+    // ------------------------------------------
+
+    const goldSpotUrl =
+      `https://api.metals.dev/v1/metal/spot?api_key=${API_KEY}&metal=gold&currency=USD`;
+
+    const goldSpotRes = await fetch(
+      goldSpotUrl,
+      {
+        headers: {
+          Accept: 'application/json',
+        },
+        cache: 'no-store',
+      }
+    );
+
+    let goldChange = 0;
+    let goldChangePercent = 0;
+
+    if (goldSpotRes.ok) {
+      const goldSpotData =
+        await goldSpotRes.json();
+
+      goldChange =
+        Number(
+          goldSpotData?.rate?.change
+        ) || 0;
+
+      goldChangePercent =
+        Number(
+          goldSpotData?.rate?.change_percent
+        ) || 0;
+    }
+
+    // ------------------------------------------
+    // SILVER SPOT / CHANGE
+    // ------------------------------------------
+
+    const silverSpotUrl =
+      `https://api.metals.dev/v1/metal/spot?api_key=${API_KEY}&metal=silver&currency=USD`;
+
+    const silverSpotRes = await fetch(
+      silverSpotUrl,
+      {
+        headers: {
+          Accept: 'application/json',
+        },
+        cache: 'no-store',
+      }
+    );
+
+    let silverChange = 0;
+    let silverChangePercent = 0;
+
+    if (silverSpotRes.ok) {
+      const silverSpotData =
+        await silverSpotRes.json();
+
+      silverChange =
+        Number(
+          silverSpotData?.rate?.change
+        ) || 0;
+
+      silverChangePercent =
+        Number(
+          silverSpotData?.rate?.change_percent
+        ) || 0;
+    }
+
+    // ------------------------------------------
+    // RETURN
+    // ------------------------------------------
+
     return res.status(200).json({
       success: true,
 
@@ -102,18 +185,32 @@ export default async function handler(req, res) {
         goldUsdOz,
         silverUsdOz,
         platinumUsdOz,
+        copperUsdMt,
       },
 
       calculatedPkr: {
         goldTola: goldTolaPkr,
         silverTola: silverTolaPkr,
         platinumTola: platinumTolaPkr,
+        copperTola: copperTolaPkr,
+      },
+
+      changes: {
+        gold: {
+          usd: goldChange,
+          percent: goldChangePercent,
+        },
+
+        silver: {
+          usd: silverChange,
+          percent: silverChangePercent,
+        },
       },
 
       usdPkr,
 
       timestamp:
-        metalsData?.timestamp ||
+        latestData?.timestamp ||
         new Date().toISOString(),
     });
 
