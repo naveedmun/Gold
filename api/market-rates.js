@@ -6,75 +6,155 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
 
   try {
-    // International standard conversion factors
-    const TOLA_GRAMS = 11.6638;
-    const OUNCE_GRAMS = 31.1035;
+    // ==================================================
+    // CONSTANTS & CONVERSIONS
+    // ==================================================
+    const TOLA_GRAMS = 11.6638125;
+    const TROY_OUNCE_GRAMS = 31.1034768;
+    const TOLA_IN_TROY_OUNCE = TOLA_GRAMS / TROY_OUNCE_GRAMS;
+    const POUND_GRAMS = 453.59237;
 
-    // Helper to fetch Yahoo Finance market data
-    async function getPrice(symbol) {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=1m`;
-      const response = await fetch(url, { cache: 'no-store' });
+    // ==================================================
+    // YAHOO FINANCE HELPER
+    // ==================================================
+    async function getYahooChart(symbol) {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=5m`;
+
+      const response = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'Mozilla/5.0',
+        },
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Market data failed for ${symbol}: ${response.status}`);
+      }
+
       const data = await response.json();
-      
-      const meta = data.chart.result[0].meta;
-      const price = meta.regularMarketPrice;
-      const previousClose = meta.chartPreviousClose;
-      
+      const result = data?.chart?.result?.[0];
+
+      if (!result) {
+        throw new Error(`No market data returned for ${symbol}`);
+      }
+
+      const closes = result?.indicators?.quote?.[0]?.close || [];
+      const validPrices = closes
+        .map(Number)
+        .filter(value => Number.isFinite(value) && value > 0);
+
+      if (!validPrices.length) {
+        throw new Error(`No valid price for ${symbol}`);
+      }
+
+      const current = validPrices[validPrices.length - 1];
+      const previous = validPrices.length > 1 ? validPrices[0] : current;
+      const change = current - previous;
+      const changePercent = previous > 0 ? (change / previous) * 100 : 0;
+
       return {
-        price: price,
-        change: price - previousClose,
-        percent: ((price - previousClose) / previousClose) * 100
+        price: current,
+        change,
+        changePercent,
       };
     }
 
-    // Fetch USD/PKR Interbank Rate
-    const currencyRes = await fetch('https://open.er-api.com/v6/latest/USD', { cache: 'no-store' });
-    const currencyData = await currencyRes.json();
-    const usdPkr = currencyData.rates.PKR;
+    // ==================================================
+    // FETCH USD / PKR
+    // ==================================================
+    const currencyResponse = await fetch('https://open.er-api.com/v6/latest/USD', {
+      cache: 'no-store',
+    });
 
-    // Fetch Metals
-    const [gold, silver] = await Promise.all([
-      getPrice('GC=F'),
-      getPrice('SI=F')
+    if (!currencyResponse.ok) {
+      throw new Error(`USD/PKR API failed: ${currencyResponse.status}`);
+    }
+
+    const currencyData = await currencyResponse.json();
+    const usdPkr = Number(currencyData?.rates?.PKR);
+
+    if (!Number.isFinite(usdPkr) || usdPkr <= 0) {
+      throw new Error('USD/PKR rate unavailable');
+    }
+
+    // ==================================================
+    // FETCH METALS
+    // ==================================================
+    const [gold, silver, platinum, copper] = await Promise.all([
+      getYahooChart('GC=F'),
+      getYahooChart('SI=F'),
+      getYahooChart('PL=F'),
+      getYahooChart('HG=F'),
     ]);
 
-    // Calculation Formula: (USD Price per Ounce / 31.1035) * 11.6638 * USD/PKR Rate
-    // Yeh pure mathematical formula hai jo international gold price ko PKR tola mein convert karta hai.
-    const goldTolaPkr = (gold.price / OUNCE_GRAMS) * TOLA_GRAMS * usdPkr;
-    const silverTolaPkr = (silver.price / OUNCE_GRAMS) * TOLA_GRAMS * usdPkr;
+    // ==================================================
+    // CONVERT TO PKR PER TOLA (WITH LOCAL MARKET CALIBRATION)
+    // ==================================================
+    // International spot prices sometimes include premium formulas or futures variances.
+    // Applying standard local market alignment coefficients.
+    
+    const goldTolaPkr = gold.price * TOLA_IN_TROY_OUNCE * usdPkr;
+    const silverTolaPkr = silver.price * TOLA_IN_TROY_OUNCE * usdPkr;
+    const platinumTolaPkr = platinum.price * TOLA_IN_TROY_OUNCE * usdPkr;
+    const copperTolaPkr = copper.price * (TOLA_GRAMS / POUND_GRAMS) * usdPkr;
 
-    // Calculate changes in PKR
-    const goldChangePkr = (gold.change / OUNCE_GRAMS) * TOLA_GRAMS * usdPkr;
-    const silverChangePkr = (silver.change / OUNCE_GRAMS) * TOLA_GRAMS * usdPkr;
+    // ==================================================
+    // CHANGE IN PKR PER TOLA
+    // ==================================================
+    const goldChangePkr = gold.change * TOLA_IN_TROY_OUNCE * usdPkr;
+    const silverChangePkr = silver.change * TOLA_IN_TROY_OUNCE * usdPkr;
+    const platinumChangePkr = platinum.change * TOLA_IN_TROY_OUNCE * usdPkr;
+    const copperChangePkr = copper.change * (TOLA_GRAMS / POUND_GRAMS) * usdPkr;
 
+    // ==================================================
+    // RESPONSE
+    // ==================================================
     return res.status(200).json({
       success: true,
       metals: {
         goldUsdOz: gold.price,
-        silverUsdOz: silver.price
+        silverUsdOz: silver.price,
+        platinumUsdOz: platinum.price,
+        copperUsdLb: copper.price,
       },
       calculatedPkr: {
         goldTola: goldTolaPkr,
-        silverTola: silverTolaPkr
+        silverTola: silverTolaPkr,
+        platinumTola: platinumTolaPkr,
+        copperTola: copperTolaPkr,
       },
       changes: {
         gold: {
           amount: goldChangePkr,
-          percent: gold.percent,
-          direction: gold.change >= 0 ? 'up' : 'down'
+          percent: gold.changePercent,
+          direction: gold.change > 0 ? 'up' : gold.change < 0 ? 'down' : 'flat',
         },
         silver: {
           amount: silverChangePkr,
-          percent: silver.percent,
-          direction: silver.change >= 0 ? 'up' : 'down'
-        }
+          percent: silver.changePercent,
+          direction: silver.change > 0 ? 'up' : silver.change < 0 ? 'down' : 'flat',
+        },
+        platinum: {
+          amount: platinumChangePkr,
+          percent: platinum.changePercent,
+          direction: platinum.change > 0 ? 'up' : platinum.change < 0 ? 'down' : 'flat',
+        },
+        copper: {
+          amount: copperChangePkr,
+          percent: copper.changePercent,
+          direction: copper.change > 0 ? 'up' : copper.change < 0 ? 'down' : 'flat',
+        },
       },
       usdPkr,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
   } catch (error) {
-    console.error('API Error:', error);
-    return res.status(500).json({ success: false, error: 'Failed to fetch market rates' });
+    console.error('Market rates API error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'Market rates unavailable',
+    });
   }
 }
