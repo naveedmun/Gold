@@ -89,11 +89,8 @@ export default async function handler(req, res) {
     ]);
 
     // ==================================================
-    // CONVERT TO PKR PER TOLA (WITH LOCAL MARKET CALIBRATION)
+    // CONVERT TO PKR PER TOLA (PURE MATH FORMULA)
     // ==================================================
-    // International spot prices sometimes include premium formulas or futures variances.
-    // Applying standard local market alignment coefficients.
-    
     const goldTolaPkr = gold.price * TOLA_IN_TROY_OUNCE * usdPkr;
     const silverTolaPkr = silver.price * TOLA_IN_TROY_OUNCE * usdPkr;
     const platinumTolaPkr = platinum.price * TOLA_IN_TROY_OUNCE * usdPkr;
