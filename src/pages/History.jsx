@@ -1,7 +1,51 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Calendar, Loader2, Search } from 'lucide-react';
+import { Calendar, Loader2, Search, Archive } from 'lucide-react';
 import { formatCurrency, getUsdSubtext } from '@/lib/conversions';
+
+const LUX_CARD = {
+  background: 'linear-gradient(160deg, #14120d 0%, #0a0908 100%)',
+  borderColor: 'rgba(212,175,55,0.18)',
+  boxShadow: '0 12px 40px -12px rgba(0,0,0,0.5)',
+};
+
+const METAL_ACCENTS = {
+  gold: { color: '#D4AF37', label: 'Gold' },
+  silver: { color: '#C0C0C0', label: 'Silver' },
+  platinum: { color: '#5FD4C8', label: 'Platinum' },
+  copper: { color: '#D2691E', label: 'Copper' },
+};
+
+function MetalRow({ metalKey, value, result, currency }) {
+  const accent = METAL_ACCENTS[metalKey];
+  return (
+    <div
+      className="rounded-2xl p-4 border"
+      style={{
+        background: `linear-gradient(135deg, ${accent.color}14, transparent 70%)`,
+        borderColor: `${accent.color}40`,
+      }}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span
+          className="h-1.5 w-1.5 rounded-full"
+          style={{ background: accent.color }}
+        />
+        <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+          {accent.label} per Tola &middot; {result.formattedDate}
+        </p>
+      </div>
+      <p className="text-2xl font-extrabold text-white">
+        {formatCurrency(value, currency, result.usd_pkr)}
+      </p>
+      {getUsdSubtext(value, currency, result.usd_pkr) && (
+        <p className="text-[11px] text-white/35 mt-0.5">
+          {getUsdSubtext(value, currency, result.usd_pkr)}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function History() {
   const { currency = 'PKR' } = useOutletContext() || {};
@@ -105,13 +149,24 @@ export default function History() {
 
   return (
     <div className="space-y-4 max-w-xl mx-auto p-2 pb-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Rate History Archives</h1>
-        <p className="text-sm text-muted-foreground">Select any date from 2016 to 2026</p>
+      <div className="flex items-center gap-3">
+        <div
+          className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
+          style={{
+            background: 'linear-gradient(135deg, #D4AF37, #B8860B)',
+            boxShadow: '0 4px 14px rgba(212,175,55,0.35)',
+          }}
+        >
+          <Archive className="h-4 w-4 text-black" strokeWidth={2.5} />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Rate History Archives</h1>
+          <p className="text-sm text-white/40">Select any date from 2016 to 2026</p>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm">
-        <label className="text-sm font-medium flex items-center gap-2 text-foreground">
+      <div className="rounded-2xl border p-4 space-y-3" style={LUX_CARD}>
+        <label className="text-sm font-medium flex items-center gap-2 text-white/80">
           <Calendar className="h-4 w-4 text-[#D4AF37]" />
           Select Date
         </label>
@@ -121,12 +176,21 @@ export default function History() {
           min="2016-01-01"
           max={today}
           onChange={(e) => setDate(e.target.value)}
-          className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/30"
+          className="w-full rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40 [color-scheme:dark]"
+          style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(212,175,55,0.2)',
+          }}
         />
         <button
           onClick={fetchRate}
           disabled={loading || !date}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#B8860B] px-4 py-3 text-white font-semibold shadow-lg shadow-[#D4AF37]/20 transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+          style={{
+            background: 'linear-gradient(135deg, #D4AF37, #B8860B)',
+            color: '#0a0908',
+            boxShadow: '0 8px 24px rgba(212,175,55,0.25)',
+          }}
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
           {loading ? 'Fetching Record...' : 'Check Exact Rate'}
@@ -135,69 +199,14 @@ export default function History() {
 
       {searched && !loading && result && (
         <div className="space-y-3 pt-2">
-          {/* Gold Card */}
-          <div className="rounded-2xl border border-[#D4AF37]/30 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Gold per Tola ({result.formattedDate})
-            </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">
-              {formatCurrency(result.gold_per_tola_pkr, currency, result.usd_pkr)}
-            </p>
-            {getUsdSubtext(result.gold_per_tola_pkr, currency, result.usd_pkr) && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {getUsdSubtext(result.gold_per_tola_pkr, currency, result.usd_pkr)}
-              </p>
-            )}
-          </div>
+          <MetalRow metalKey="gold" value={result.gold_per_tola_pkr} result={result} currency={currency} />
+          <MetalRow metalKey="silver" value={result.silver_per_tola_pkr} result={result} currency={currency} />
+          <MetalRow metalKey="platinum" value={result.platinum_per_tola_pkr} result={result} currency={currency} />
+          <MetalRow metalKey="copper" value={result.copper_per_tola_pkr} result={result} currency={currency} />
 
-          {/* Silver Card */}
-          <div className="rounded-2xl border border-[#C0C0C0]/30 bg-gradient-to-br from-[#C0C0C0]/10 to-transparent p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Silver per Tola ({result.formattedDate})
-            </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">
-              {formatCurrency(result.silver_per_tola_pkr, currency, result.usd_pkr)}
-            </p>
-            {getUsdSubtext(result.silver_per_tola_pkr, currency, result.usd_pkr) && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {getUsdSubtext(result.silver_per_tola_pkr, currency, result.usd_pkr)}
-              </p>
-            )}
-          </div>
-
-          {/* Platinum Card */}
-          <div className="rounded-2xl border border-[#008B8B]/30 bg-gradient-to-br from-[#008B8B]/10 to-transparent p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Platinum per Tola ({result.formattedDate})
-            </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">
-              {formatCurrency(result.platinum_per_tola_pkr, currency, result.usd_pkr)}
-            </p>
-            {getUsdSubtext(result.platinum_per_tola_pkr, currency, result.usd_pkr) && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {getUsdSubtext(result.platinum_per_tola_pkr, currency, result.usd_pkr)}
-              </p>
-            )}
-          </div>
-
-          {/* Copper Card */}
-          <div className="rounded-2xl border border-[#D2691E]/30 bg-gradient-to-br from-[#D2691E]/10 to-transparent p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Copper per Tola ({result.formattedDate})
-            </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">
-              {formatCurrency(result.copper_per_tola_pkr, currency, result.usd_pkr)}
-            </p>
-            {getUsdSubtext(result.copper_per_tola_pkr, currency, result.usd_pkr) && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {getUsdSubtext(result.copper_per_tola_pkr, currency, result.usd_pkr)}
-              </p>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Historical USD/PKR Rate on {result.formattedDate}</p>
-            <p className="text-lg font-bold mt-1">Rs {result.usd_pkr.toFixed(2)}</p>
+          <div className="rounded-2xl border p-4" style={LUX_CARD}>
+            <p className="text-[11px] text-white/40">Historical USD/PKR Rate on {result.formattedDate}</p>
+            <p className="text-lg font-bold mt-1 text-white">Rs {result.usd_pkr.toFixed(2)}</p>
           </div>
         </div>
       )}
