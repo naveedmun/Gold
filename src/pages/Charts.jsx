@@ -1,19 +1,6 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { BarChart2, LineChart, TrendingUp, TrendingDown } from 'lucide-react';
-
-const LUX_CARD = {
-  background:
-    'radial-gradient(120% 140% at 0% 0%, rgba(212,175,55,0.10) 0%, rgba(15,14,11,0.98) 45%), linear-gradient(160deg, #14120d 0%, #0a0908 100%)',
-  borderColor: 'rgba(212,175,55,0.18)',
-  boxShadow: '0 20px 60px -15px rgba(0,0,0,0.55)',
-};
-
-const LUX_CARD_SM = {
-  background: 'linear-gradient(160deg, #14120d 0%, #0a0908 100%)',
-  borderColor: 'rgba(212,175,55,0.18)',
-  boxShadow: '0 12px 40px -12px rgba(0,0,0,0.5)',
-};
+import { BarChart2, LineChart } from 'lucide-react';
 
 export default function Charts() {
   const context = useOutletContext() || {};
@@ -93,7 +80,6 @@ export default function Charts() {
   const startPrice = prices[0];
   const endPrice = prices[prices.length - 1];
   const changePct = (((endPrice - startPrice) / startPrice) * 100).toFixed(1);
-  const isPositive = Number(changePct) >= 0;
 
   const formatShortValue = (pkrAmount) => {
     if (currency === 'USD') {
@@ -124,57 +110,29 @@ export default function Charts() {
     }, '');
   };
 
-  const generateAreaPath = () => {
-    if (!points.length) return '';
-    const line = generateSvgPath();
-    const last = points[points.length - 1];
-    const first = points[0];
-    return `${line} L ${last.x},100 L ${first.x},100 Z`;
-  };
-
   return (
     <div className="space-y-4 max-w-2xl mx-auto p-2 pb-6">
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div
-            className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, #D4AF37, #B8860B)',
-              boxShadow: '0 4px 14px rgba(212,175,55,0.35)',
-            }}
-          >
-            <LineChart className="h-4 w-4 text-black" strokeWidth={2.5} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Price Charts</h1>
-            <p className="text-sm text-white/40">Historical gold & silver trends</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Price Charts</h1>
+          <p className="text-sm text-muted-foreground">Historical gold & silver trends</p>
         </div>
 
-        <div
-          className="flex p-1 rounded-xl border"
-          style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(212,175,55,0.18)' }}
-        >
+        <div className="flex bg-muted p-1 rounded-xl border border-border">
           <button
             onClick={() => setChartType('line')}
-            className="p-2 rounded-lg transition-all"
-            style={
-              chartType === 'line'
-                ? { background: 'rgba(212,175,55,0.15)', color: '#E8C567' }
-                : { color: 'rgba(255,255,255,0.35)' }
-            }
+            className={`p-2 rounded-lg transition-all ${
+              chartType === 'line' ? 'bg-card text-[#D4AF37] shadow-sm' : 'text-muted-foreground'
+            }`}
             title="Line View"
           >
             <LineChart className="h-4 w-4" />
           </button>
           <button
             onClick={() => setChartType('bar')}
-            className="p-2 rounded-lg transition-all"
-            style={
-              chartType === 'bar'
-                ? { background: 'rgba(212,175,55,0.15)', color: '#E8C567' }
-                : { color: 'rgba(255,255,255,0.35)' }
-            }
+            className={`p-2 rounded-lg transition-all ${
+              chartType === 'bar' ? 'bg-card text-[#D4AF37] shadow-sm' : 'text-muted-foreground'
+            }`}
             title="Bar View"
           >
             <BarChart2 className="h-4 w-4" />
@@ -182,31 +140,26 @@ export default function Charts() {
         </div>
       </div>
 
-      <div
-        className="flex p-1 rounded-xl max-w-xs mx-auto border"
-        style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(212,175,55,0.18)' }}
-      >
-        {['gold', 'silver'].map((metal) => (
-          <button
-            key={metal}
-            onClick={() => setSelectedMetal(metal)}
-            className="flex-1 py-1.5 text-xs font-semibold rounded-lg capitalize transition-all"
-            style={
-              selectedMetal === metal
-                ? {
-                    background: 'linear-gradient(135deg, #D4AF37, #B8860B)',
-                    color: '#0a0908',
-                    boxShadow: '0 4px 12px rgba(212,175,55,0.3)',
-                  }
-                : { color: 'rgba(255,255,255,0.45)' }
-            }
-          >
-            {metal}
-          </button>
-        ))}
+      <div className="flex bg-muted p-1 rounded-xl max-w-xs mx-auto">
+        <button
+          onClick={() => setSelectedMetal('gold')}
+          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg capitalize transition ${
+            selectedMetal === 'gold' ? 'bg-[#D4AF37] text-white shadow-sm' : 'text-muted-foreground'
+          }`}
+        >
+          Gold
+        </button>
+        <button
+          onClick={() => setSelectedMetal('silver')}
+          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg capitalize transition ${
+            selectedMetal === 'silver' ? 'bg-[#D4AF37] text-white shadow-sm' : 'text-muted-foreground'
+          }`}
+        >
+          Silver
+        </button>
       </div>
 
-      <div className="flex justify-center gap-1.5 pt-1 overflow-x-auto">
+      <div className="flex justify-center gap-1.5 pt-1">
         {['1D', '1W', '1M', '1Y', '5Y', '10Y'].map((tf) => (
           <button
             key={tf}
@@ -214,46 +167,30 @@ export default function Charts() {
               setTimeframe(tf);
               setHoveredPoint(null);
             }}
-            className="px-3 py-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap"
-            style={
+            className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
               timeframe === tf
-                ? {
-                    background: 'linear-gradient(135deg, #D4AF37, #B8860B)',
-                    color: '#0a0908',
-                    boxShadow: '0 4px 12px rgba(212,175,55,0.3)',
-                  }
-                : { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)' }
-            }
+                ? 'bg-[#D4AF37] text-white shadow-sm'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
           >
-            {tf === '10Y' ? 'Since 2016' : tf}
+            {tf}
           </button>
         ))}
       </div>
 
-      <div className="relative rounded-3xl border p-5 space-y-4 overflow-hidden" style={LUX_CARD}>
-        <div
-          className="absolute top-0 left-0 right-0 h-px"
-          style={{ background: 'linear-gradient(90deg, transparent, rgba(212,175,55,0.6), transparent)' }}
-        />
-
-        <div
-          className="min-h-[36px] flex items-center justify-between border-b pb-2"
-          style={{ borderColor: 'rgba(255,255,255,0.06)' }}
-        >
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4 relative">
+        <div className="min-h-[32px] flex items-center justify-between border-b border-border/50 pb-2">
           {hoveredPoint ? (
-            <div
-              className="flex justify-between items-center w-full px-3 py-1.5 rounded-lg border transition-all"
-              style={{ background: 'rgba(212,175,55,0.08)', borderColor: 'rgba(212,175,55,0.3)' }}
-            >
-              <span className="text-xs font-semibold text-white/50">
-                {hoveredPoint.label}
+            <div className="flex justify-between items-center w-full bg-muted/60 px-3 py-1.5 rounded-lg border border-[#D4AF37]/30 transition-all">
+              <span className="text-xs font-semibold text-muted-foreground">
+                Time: <strong className="text-foreground">{hoveredPoint.label}</strong>
               </span>
-              <span className="text-sm font-black text-[#E8C567]">
+              <span className="text-sm font-black text-[#D4AF37]">
                 {formatCurrency(hoveredPoint.price)}
               </span>
             </div>
           ) : (
-            <p className="text-xs text-white/30 italic w-full text-center">
+            <p className="text-xs text-muted-foreground italic w-full text-center">
               Hover / touch graph points to view detailed rate
             </p>
           )}
@@ -275,24 +212,20 @@ export default function Charts() {
                   onMouseLeave={() => setHoveredPoint(null)}
                   className="flex-1 flex flex-col items-center h-full justify-end gap-2 cursor-pointer group"
                 >
-                  <span
-                    className="text-[10px] font-bold transition-colors"
-                    style={{ color: isHovered ? '#E8C567' : 'rgba(255,255,255,0.4)' }}
-                  >
+                  <span className={`text-[10px] font-bold transition-colors ${
+                    isHovered ? 'text-[#D4AF37]' : 'text-muted-foreground'
+                  }`}>
                     {formatShortValue(item.price)}
                   </span>
                   <div
-                    style={{
-                      height: `${heightPercent}%`,
-                      background: isHovered
-                        ? 'linear-gradient(180deg, #F4E4B0, #D4AF37)'
-                        : 'linear-gradient(180deg, #D4AF37, #B8860B)',
-                      opacity: isHovered ? 1 : 0.75,
-                      boxShadow: isHovered ? '0 4px 20px rgba(212,175,55,0.4)' : 'none',
-                    }}
-                    className="w-full rounded-t-md transition-all duration-300 group-hover:opacity-100"
+                    style={{ height: `${heightPercent}%` }}
+                    className={`w-full rounded-t-md transition-all duration-300 ${
+                      isHovered
+                        ? 'bg-[#D4AF37] shadow-lg shadow-[#D4AF37]/30 scale-105'
+                        : 'bg-gradient-to-t from-[#B8860B] to-[#D4AF37] opacity-80 group-hover:opacity-100'
+                    }`}
                   />
-                  <span className="text-[11px] text-white/35 font-semibold">{item.label}</span>
+                  <span className="text-[11px] text-muted-foreground font-semibold">{item.label}</span>
                 </div>
               );
             })}
@@ -301,29 +234,12 @@ export default function Charts() {
           <div className="space-y-4">
             <div className="relative h-52 w-full pt-4">
               <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="chartsAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#D4AF37" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="#D4AF37" stopOpacity={0} />
-                  </linearGradient>
-                  <filter id="chartsGlow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="1.5" result="blur" />
-                    <feMerge>
-                      <feMergeNode in="blur" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                </defs>
-
-                <path d={generateAreaPath()} fill="url(#chartsAreaGradient)" stroke="none" />
-
                 <path
                   d={generateSvgPath()}
                   fill="none"
                   stroke="#D4AF37"
-                  strokeWidth="2.5"
+                  strokeWidth="3"
                   vectorEffect="non-scaling-stroke"
-                  filter="url(#chartsGlow)"
                 />
                 {points.map((pt, idx) => {
                   const isHovered = hoveredPoint?.label === pt.label;
@@ -342,9 +258,9 @@ export default function Charts() {
                       <circle
                         cx={pt.x}
                         cy={pt.y}
-                        r={isHovered ? '3' : '2'}
-                        fill={isHovered ? '#F4E4B0' : '#D4AF37'}
-                        stroke="#0a0908"
+                        r={isHovered ? "3" : "2"}
+                        fill={isHovered ? "#ffffff" : "#D4AF37"}
+                        stroke="#B8860B"
                         strokeWidth="1.5"
                         vectorEffect="non-scaling-stroke"
                       />
@@ -366,14 +282,10 @@ export default function Charts() {
             <div className="flex justify-between items-center px-1">
               {currentData.map((item, idx) => (
                 <div key={idx} className="text-center">
-                  <p className="text-[11px] font-semibold text-white/35">{item.label}</p>
-                  <p
-                    className="text-[10px] font-bold"
-                    style={{
-                      color:
-                        hoveredPoint?.label === item.label ? '#E8C567' : 'rgba(255,255,255,0.75)',
-                    }}
-                  >
+                  <p className="text-[11px] font-semibold text-muted-foreground">{item.label}</p>
+                  <p className={`text-[10px] font-bold ${
+                    hoveredPoint?.label === item.label ? 'text-[#D4AF37]' : 'text-foreground'
+                  }`}>
                     {formatShortValue(item.price)}
                   </p>
                 </div>
@@ -384,22 +296,21 @@ export default function Charts() {
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl border p-3 text-center" style={LUX_CARD_SM}>
-          <p className="text-xs text-white/40">High</p>
-          <p className="text-sm font-bold text-white mt-0.5">{formatCurrency(maxPrice)}</p>
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
+          <p className="text-xs text-muted-foreground">High</p>
+          <p className="text-sm font-bold text-foreground mt-0.5">
+            {formatCurrency(maxPrice)}
+          </p>
         </div>
-        <div className="rounded-xl border p-3 text-center" style={LUX_CARD_SM}>
-          <p className="text-xs text-white/40">Low</p>
-          <p className="text-sm font-bold text-white mt-0.5">{formatCurrency(minPrice)}</p>
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
+          <p className="text-xs text-muted-foreground">Low</p>
+          <p className="text-sm font-bold text-foreground mt-0.5">
+            {formatCurrency(minPrice)}
+          </p>
         </div>
-        <div className="rounded-xl border p-3 text-center" style={LUX_CARD_SM}>
-          <p className="text-xs text-white/40">Change</p>
-          <p
-            className={`text-sm font-bold mt-0.5 flex items-center justify-center gap-1 ${
-              isPositive ? 'text-emerald-400' : 'text-rose-400'
-            }`}
-          >
-            {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
+          <p className="text-xs text-muted-foreground">Change</p>
+          <p className={`text-sm font-bold mt-0.5 ${Number(changePct) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {changePct}%
           </p>
         </div>
