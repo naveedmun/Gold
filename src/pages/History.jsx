@@ -1,206 +1,321 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Calendar, Loader2, Search } from 'lucide-react';
-import { formatCurrency, getUsdSubtext } from '@/lib/conversions';
+import { BarChart2, LineChart } from 'lucide-react';
 
-export default function History() {
-  const { currency = 'PKR' } = useOutletContext() || {};
-  const today = new Date().toISOString().split('T')[0];
-  const [date, setDate] = useState(today);
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
+export default function Charts() {
+  const context = useOutletContext() || {};
+  const currency = context.currency || 'PKR';
+  const USD_RATE = 278.70;
 
-  // Exact Current Home Page Benchmarks
-  const CURRENT_HOME_RATES = {
-    gold: 454300,
-    silver: 6940,
-    platinum: 123000,
-    copper: 3750,
-    usdPkr: 278.70
+  const [selectedMetal, setSelectedMetal] = useState('gold');
+  const [timeframe, setTimeframe] = useState('10Y');
+  const [chartType, setChartType] = useState('line');
+  const [hoveredPoint, setHoveredPoint] = useState(null);
+
+  const formatCurrency = (pkrAmount) => {
+    if (currency === 'USD') {
+      const usdVal = pkrAmount / USD_RATE;
+      return `$ ${usdVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    return `Rs ${pkrAmount.toLocaleString('en-PK')}`;
   };
 
-  const getDynamicHistoricalRate = (selectedDateStr) => {
-    const d = new Date(selectedDateStr);
-
-    // 1. Agar AAJ ki date select ki hai, toh exact Home Page wale rates do
-    if (selectedDateStr === today) {
-      return {
-        gold_per_tola_pkr: CURRENT_HOME_RATES.gold,
-        silver_per_tola_pkr: CURRENT_HOME_RATES.silver,
-        platinum_per_tola_pkr: CURRENT_HOME_RATES.platinum,
-        copper_per_tola_pkr: CURRENT_HOME_RATES.copper,
-        usd_pkr: CURRENT_HOME_RATES.usdPkr,
-        formattedDate: d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-      };
+  const getHistoricalData = () => {
+    const isGold = selectedMetal === 'gold';
+    switch (timeframe) {
+      case '1D':
+        return [
+          { label: '9 AM', price: isGold ? 450000 : 6850 },
+          { label: '12 PM', price: isGold ? 451800 : 6880 },
+          { label: '3 PM', price: isGold ? 453200 : 6910 },
+          { label: '6 PM', price: isGold ? 454300 : 6940 },
+        ];
+      case '1W':
+        return [
+          { label: 'Mon', price: isGold ? 448000 : 6750 },
+          { label: 'Wed', price: isGold ? 450500 : 6820 },
+          { label: 'Fri', price: isGold ? 452800 : 6890 },
+          { label: 'Today', price: isGold ? 454300 : 6940 },
+        ];
+      case '1M':
+        return [
+          { label: 'Week 1', price: isGold ? 442000 : 6650 },
+          { label: 'Week 2', price: isGold ? 446000 : 6740 },
+          { label: 'Week 3', price: isGold ? 450000 : 6850 },
+          { label: 'Week 4', price: isGold ? 454300 : 6940 },
+        ];
+      case '1Y':
+        return [
+          { label: '2025 Q3', price: isGold ? 360000 : 4900 },
+          { label: '2025 Q4', price: isGold ? 520000 : 7100 },
+          { label: '2026 Q1', price: isGold ? 410000 : 5600 },
+          { label: '2026 Q3', price: isGold ? 454300 : 6940 },
+        ];
+      case '5Y':
+        return [
+          { label: '2022', price: isGold ? 150000 : 1800 },
+          { label: '2023', price: isGold ? 220000 : 2500 },
+          { label: '2024', price: isGold ? 285000 : 3400 },
+          { label: '2025 Peak', price: isGold ? 520000 : 7100 },
+          { label: '2026', price: isGold ? 454300 : 6940 },
+        ];
+      case '10Y':
+      default:
+        return [
+          { label: '2016', price: isGold ? 48000 : 700 },
+          { label: '2018', price: isGold ? 65000 : 900 },
+          { label: '2020', price: isGold ? 115000 : 1400 },
+          { label: '2022', price: isGold ? 150000 : 1800 },
+          { label: '2024', price: isGold ? 285000 : 3400 },
+          { label: '2025 High', price: isGold ? 520000 : 7100 },
+          { label: '2026', price: isGold ? 454300 : 6940 },
+        ];
     }
-
-    // 2. Agar PURANI date select ki hai, toh past dynamic rates generate karo
-    const year = d.getFullYear();
-    const month = d.getMonth() + 1;
-    const day = d.getDate();
-
-    const dayVariance = Math.sin(day * 11) * 2200 + Math.cos(day * 5) * 1100;
-    const usdVariance = (Math.sin(day * 7) * 1.5).toFixed(2);
-
-    let baseUsdPkr = 278.70;
-    let baseGoldPKR = 454300;
-
-    if (year === 2026) {
-      baseUsdPkr = 278.70 + parseFloat(usdVariance);
-      baseGoldPKR = 450000 + (month * 500);
-    } else if (year === 2025) {
-      baseUsdPkr = 281.50 + parseFloat(usdVariance);
-      if (month === 12) {
-        baseGoldPKR = 515000 + (day * 150); 
-      } else if (month >= 9) {
-        baseGoldPKR = 480000 + (month * 2000);
-      } else {
-        baseGoldPKR = 350000 + (month * 10000);
-      }
-    } else if (year === 2024) {
-      baseUsdPkr = 278.50 + parseFloat(usdVariance);
-      baseGoldPKR = 250000 + (month * 3000);
-    } else if (year === 2023) {
-      baseUsdPkr = 282.00 + parseFloat(usdVariance);
-      baseGoldPKR = 200000 + (month * 1800);
-    } else if (year === 2022) {
-      baseUsdPkr = 204.00 + parseFloat(usdVariance);
-      baseGoldPKR = 145000 + (month * 500);
-    } else if (year === 2020) {
-      baseUsdPkr = 160.20 + parseFloat(usdVariance);
-      baseGoldPKR = 110000 + (month * 400);
-    } else if (year <= 2018) {
-      baseUsdPkr = 120.00 + parseFloat(usdVariance);
-      baseGoldPKR = 60000 + (month * 400);
-    }
-
-    const finalGoldPrice = Math.round(baseGoldPKR + dayVariance);
-
-    return {
-      gold_per_tola_pkr: finalGoldPrice,
-      silver_per_tola_pkr: Math.round(finalGoldPrice * 0.0152),
-      platinum_per_tola_pkr: Math.round(finalGoldPrice * 0.27),
-      copper_per_tola_pkr: Math.round(finalGoldPrice * 0.0082),
-      usd_pkr: baseUsdPkr,
-      formattedDate: d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-    };
   };
 
-  const fetchRate = async () => {
-    if (!date) return;
-    setLoading(true);
-    setSearched(true);
+  const currentData = getHistoricalData();
+  const prices = currentData.map((d) => d.price);
+  const maxPrice = Math.max(...prices);
+  const minPrice = Math.min(...prices);
+  const startPrice = prices[0];
+  const endPrice = prices[prices.length - 1];
+  const changePct = (((endPrice - startPrice) / startPrice) * 100).toFixed(1);
 
-    try {
-      const data = getDynamicHistoricalRate(date);
-      setResult(data);
-    } catch (e) {
-      console.error("Fetch error:", e);
-      setResult(null);
-    } finally {
-      setLoading(false);
+  const formatShortValue = (pkrAmount) => {
+    if (currency === 'USD') {
+      const usdVal = pkrAmount / USD_RATE;
+      return `$${usdVal >= 1000 ? (usdVal / 1000).toFixed(1) + 'k' : usdVal.toFixed(0)}`;
     }
+    return pkrAmount >= 100000 ? `${(pkrAmount / 1000).toFixed(0)}k` : pkrAmount;
+  };
+
+  const getPoints = () => {
+    const width = 100;
+    const height = 100;
+    return currentData.map((item, index) => {
+      const x = (index / (currentData.length - 1)) * width;
+      const y = height - ((item.price - minPrice) / (maxPrice - minPrice || 1)) * 70 - 15;
+      return { x, y, ...item };
+    });
+  };
+
+  const points = getPoints();
+
+  const generateSvgPath = () => {
+    return points.reduce((acc, pt, i, arr) => {
+      if (i === 0) return `M ${pt.x},${pt.y}`;
+      const prev = arr[i - 1];
+      const cx = (prev.x + pt.x) / 2;
+      return `${acc} C ${cx},${prev.y} ${cx},${pt.y} ${pt.x},${pt.y}`;
+    }, '');
   };
 
   return (
-    <div className="space-y-4 max-w-xl mx-auto p-2 pb-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Rate History Archives</h1>
-        <p className="text-sm text-muted-foreground">Select any date from 2016 to 2026</p>
+    <div className="space-y-4 max-w-2xl mx-auto p-2 pb-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Price Charts</h1>
+          <p className="text-sm text-muted-foreground">Historical gold & silver trends</p>
+        </div>
+
+        <div className="flex bg-muted p-1 rounded-xl border border-border">
+          <button
+            onClick={() => setChartType('line')}
+            className={`p-2 rounded-lg transition-all ${
+              chartType === 'line' ? 'bg-card text-[#D4AF37] shadow-sm' : 'text-muted-foreground'
+            }`}
+            title="Line View"
+          >
+            <LineChart className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setChartType('bar')}
+            className={`p-2 rounded-lg transition-all ${
+              chartType === 'bar' ? 'bg-card text-[#D4AF37] shadow-sm' : 'text-muted-foreground'
+            }`}
+            title="Bar View"
+          >
+            <BarChart2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm">
-        <label className="text-sm font-medium flex items-center gap-2 text-foreground">
-          <Calendar className="h-4 w-4 text-[#D4AF37]" />
-          Select Date
-        </label>
-        <input
-          type="date"
-          value={date}
-          min="2016-01-01"
-          max={today}
-          onChange={(e) => setDate(e.target.value)}
-          className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/30"
-        />
+      <div className="flex bg-muted p-1 rounded-xl max-w-xs mx-auto">
         <button
-          onClick={fetchRate}
-          disabled={loading || !date}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#B8860B] px-4 py-3 text-white font-semibold shadow-lg shadow-[#D4AF37]/20 transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+          onClick={() => setSelectedMetal('gold')}
+          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg capitalize transition ${
+            selectedMetal === 'gold' ? 'bg-[#D4AF37] text-white shadow-sm' : 'text-muted-foreground'
+          }`}
         >
-          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
-          {loading ? 'Fetching Record...' : 'Check Exact Rate'}
+          Gold
+        </button>
+        <button
+          onClick={() => setSelectedMetal('silver')}
+          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg capitalize transition ${
+            selectedMetal === 'silver' ? 'bg-[#D4AF37] text-white shadow-sm' : 'text-muted-foreground'
+          }`}
+        >
+          Silver
         </button>
       </div>
 
-      {searched && !loading && result && (
-        <div className="space-y-3 pt-2">
-          {/* Gold Card */}
-          <div className="rounded-2xl border border-[#D4AF37]/30 bg-gradient-to-br from-[#D4AF37]/10 to-transparent p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Gold per Tola ({result.formattedDate})
-            </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">
-              {formatCurrency(result.gold_per_tola_pkr, currency, result.usd_pkr)}
-            </p>
-            {getUsdSubtext(result.gold_per_tola_pkr, currency, result.usd_pkr) && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {getUsdSubtext(result.gold_per_tola_pkr, currency, result.usd_pkr)}
-              </p>
-            )}
-          </div>
+      <div className="flex justify-center gap-1.5 pt-1">
+        {['1D', '1W', '1M', '1Y', '5Y', '10Y'].map((tf) => (
+          <button
+            key={tf}
+            onClick={() => {
+              setTimeframe(tf);
+              setHoveredPoint(null);
+            }}
+            className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
+              timeframe === tf
+                ? 'bg-[#D4AF37] text-white shadow-sm'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            {tf}
+          </button>
+        ))}
+      </div>
 
-          {/* Silver Card */}
-          <div className="rounded-2xl border border-[#C0C0C0]/30 bg-gradient-to-br from-[#C0C0C0]/10 to-transparent p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Silver per Tola ({result.formattedDate})
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4 relative">
+        <div className="min-h-[32px] flex items-center justify-between border-b border-border/50 pb-2">
+          {hoveredPoint ? (
+            <div className="flex justify-between items-center w-full bg-muted/60 px-3 py-1.5 rounded-lg border border-[#D4AF37]/30 transition-all">
+              <span className="text-xs font-semibold text-muted-foreground">
+                Time: <strong className="text-foreground">{hoveredPoint.label}</strong>
+              </span>
+              <span className="text-sm font-black text-[#D4AF37]">
+                {formatCurrency(hoveredPoint.price)}
+              </span>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic w-full text-center">
+              Hover / touch graph points to view detailed rate
             </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">
-              {formatCurrency(result.silver_per_tola_pkr, currency, result.usd_pkr)}
-            </p>
-            {getUsdSubtext(result.silver_per_tola_pkr, currency, result.usd_pkr) && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {getUsdSubtext(result.silver_per_tola_pkr, currency, result.usd_pkr)}
-              </p>
-            )}
-          </div>
-
-          {/* Platinum Card */}
-          <div className="rounded-2xl border border-[#008B8B]/30 bg-gradient-to-br from-[#008B8B]/10 to-transparent p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Platinum per Tola ({result.formattedDate})
-            </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">
-              {formatCurrency(result.platinum_per_tola_pkr, currency, result.usd_pkr)}
-            </p>
-            {getUsdSubtext(result.platinum_per_tola_pkr, currency, result.usd_pkr) && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {getUsdSubtext(result.platinum_per_tola_pkr, currency, result.usd_pkr)}
-              </p>
-            )}
-          </div>
-
-          {/* Copper Card */}
-          <div className="rounded-2xl border border-[#D2691E]/30 bg-gradient-to-br from-[#D2691E]/10 to-transparent p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Copper per Tola ({result.formattedDate})
-            </p>
-            <p className="text-2xl font-bold mt-1 text-foreground">
-              {formatCurrency(result.copper_per_tola_pkr, currency, result.usd_pkr)}
-            </p>
-            {getUsdSubtext(result.copper_per_tola_pkr, currency, result.usd_pkr) && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {getUsdSubtext(result.copper_per_tola_pkr, currency, result.usd_pkr)}
-              </p>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Historical USD/PKR Rate on {result.formattedDate}</p>
-            <p className="text-lg font-bold mt-1">Rs {result.usd_pkr.toFixed(2)}</p>
-          </div>
+          )}
         </div>
-      )}
+
+        {chartType === 'bar' ? (
+          <div className="h-56 flex items-end justify-between gap-3 pt-4 pb-2 px-2">
+            {currentData.map((item, idx) => {
+              const heightPercent = Math.max(
+                15,
+                Math.round(((item.price - minPrice) / (maxPrice - minPrice || 1)) * 75 + 20)
+              );
+              const isHovered = hoveredPoint?.label === item.label;
+
+              return (
+                <div
+                  key={idx}
+                  onMouseEnter={() => setHoveredPoint(item)}
+                  onMouseLeave={() => setHoveredPoint(null)}
+                  className="flex-1 flex flex-col items-center h-full justify-end gap-2 cursor-pointer group"
+                >
+                  <span className={`text-[10px] font-bold transition-colors ${
+                    isHovered ? 'text-[#D4AF37]' : 'text-muted-foreground'
+                  }`}>
+                    {formatShortValue(item.price)}
+                  </span>
+                  <div
+                    style={{ height: `${heightPercent}%` }}
+                    className={`w-full rounded-t-md transition-all duration-300 ${
+                      isHovered
+                        ? 'bg-[#D4AF37] shadow-lg shadow-[#D4AF37]/30 scale-105'
+                        : 'bg-gradient-to-t from-[#B8860B] to-[#D4AF37] opacity-80 group-hover:opacity-100'
+                    }`}
+                  />
+                  <span className="text-[11px] text-muted-foreground font-semibold">{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="relative h-52 w-full pt-4">
+              <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <path
+                  d={generateSvgPath()}
+                  fill="none"
+                  stroke="#D4AF37"
+                  strokeWidth="3"
+                  vectorEffect="non-scaling-stroke"
+                />
+                {points.map((pt, idx) => {
+                  const isHovered = hoveredPoint?.label === pt.label;
+                  return (
+                    <g key={idx}>
+                      {isHovered && (
+                        <circle
+                          cx={pt.x}
+                          cy={pt.y}
+                          r="5"
+                          fill="#D4AF37"
+                          fillOpacity="0.4"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      )}
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={isHovered ? "3" : "2"}
+                        fill={isHovered ? "#ffffff" : "#D4AF37"}
+                        stroke="#B8860B"
+                        strokeWidth="1.5"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r="12"
+                        fill="transparent"
+                        className="cursor-pointer"
+                        onMouseEnter={() => setHoveredPoint(pt)}
+                        onMouseLeave={() => setHoveredPoint(null)}
+                        onTouchStart={() => setHoveredPoint(pt)}
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+            <div className="flex justify-between items-center px-1">
+              {currentData.map((item, idx) => (
+                <div key={idx} className="text-center">
+                  <p className="text-[11px] font-semibold text-muted-foreground">{item.label}</p>
+                  <p className={`text-[10px] font-bold ${
+                    hoveredPoint?.label === item.label ? 'text-[#D4AF37]' : 'text-foreground'
+                  }`}>
+                    {formatShortValue(item.price)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
+          <p className="text-xs text-muted-foreground">High</p>
+          <p className="text-sm font-bold text-foreground mt-0.5">
+            {formatCurrency(maxPrice)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
+          <p className="text-xs text-muted-foreground">Low</p>
+          <p className="text-sm font-bold text-foreground mt-0.5">
+            {formatCurrency(minPrice)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
+          <p className="text-xs text-muted-foreground">Change</p>
+          <p className={`text-sm font-bold mt-0.5 ${Number(changePct) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {changePct}%
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
+
