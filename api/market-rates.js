@@ -12,52 +12,43 @@ export default async function handler(req, res) {
     const TOLA_GRAMS = 11.6638125;
     const TROY_OUNCE_GRAMS = 31.1034768;
     const TOLA_IN_TROY_OUNCE = TOLA_GRAMS / TROY_OUNCE_GRAMS;
-    const POUND_GRAMS = 453.59237;
+
+    const GOLDAPI_KEY = process.env.GOLDAPI_KEY;
+
+    if (!GOLDAPI_KEY) {
+      throw new Error('GOLDAPI_KEY environment variable is missing');
+    }
 
     // ==================================================
-    // YAHOO FINANCE HELPER
+    // GOLDAPI.IO HELPER
     // ==================================================
-    async function getYahooChart(symbol) {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=5m`;
+    async function getGoldApiPrice(symbol) {
+      const url = `https://www.goldapi.io/api/price/${symbol}/USD`;
 
       const response = await fetch(url, {
         headers: {
-          Accept: 'application/json',
-          'User-Agent': 'Mozilla/5.0',
+          'x-access-token': GOLDAPI_KEY,
+          'Content-Type': 'application/json',
         },
         cache: 'no-store',
       });
 
       if (!response.ok) {
-        throw new Error(`Market data failed for ${symbol}: ${response.status}`);
+        const errText = await response.text().catch(() => '');
+        throw new Error(`GoldAPI failed for ${symbol}: ${response.status} ${errText}`);
       }
 
       const data = await response.json();
-      const result = data?.chart?.result?.[0];
 
-      if (!result) {
-        throw new Error(`No market data returned for ${symbol}`);
+      const price = Number(data?.price);
+      const change = Number(data?.ch ?? 0);
+      const changePercent = Number(data?.chp ?? 0);
+
+      if (!Number.isFinite(price) || price <= 0) {
+        throw new Error(`No valid price returned for ${symbol}`);
       }
 
-      const closes = result?.indicators?.quote?.[0]?.close || [];
-      const validPrices = closes
-        .map(Number)
-        .filter(value => Number.isFinite(value) && value > 0);
-
-      if (!validPrices.length) {
-        throw new Error(`No valid price for ${symbol}`);
-      }
-
-      const current = validPrices[validPrices.length - 1];
-      const previous = validPrices.length > 1 ? validPrices[0] : current;
-      const change = current - previous;
-      const changePercent = previous > 0 ? (change / previous) * 100 : 0;
-
-      return {
-        price: current,
-        change,
-        changePercent,
-      };
+      return { price, change, changePercent };
     }
 
     // ==================================================
@@ -79,25 +70,20 @@ export default async function handler(req, res) {
     }
 
     // ==================================================
-    // FETCH METALS
+    // FETCH METALS (GoldAPI symbols: XAU, XAG, XPT)
     // ==================================================
-    const [gold, silver, platinum, copper] = await Promise.all([
-      getYahooChart('GC=F'),
-      getYahooChart('SI=F'),
-      getYahooChart('PL=F'),
-      getYahooChart('HG=F'),
+    const [gold, silver, platinum] = await Promise.all([
+      getGoldApiPrice('XAU'),
+      getGoldApiPrice('XAG'),
+      getGoldApiPrice('XPT'),
     ]);
 
     // ==================================================
-    // CONVERT TO PKR PER TOLA (WITH LOCAL MARKET CALIBRATION)
+    // CONVERT TO PKR PER TOLA
     // ==================================================
-    // International spot prices sometimes include premium formulas or futures variances.
-    // Applying standard local market alignment coefficients.
-    
     const goldTolaPkr = gold.price * TOLA_IN_TROY_OUNCE * usdPkr;
     const silverTolaPkr = silver.price * TOLA_IN_TROY_OUNCE * usdPkr;
     const platinumTolaPkr = platinum.price * TOLA_IN_TROY_OUNCE * usdPkr;
-    const copperTolaPkr = copper.price * (TOLA_GRAMS / POUND_GRAMS) * usdPkr;
 
     // ==================================================
     // CHANGE IN PKR PER TOLA
@@ -105,7 +91,6 @@ export default async function handler(req, res) {
     const goldChangePkr = gold.change * TOLA_IN_TROY_OUNCE * usdPkr;
     const silverChangePkr = silver.change * TOLA_IN_TROY_OUNCE * usdPkr;
     const platinumChangePkr = platinum.change * TOLA_IN_TROY_OUNCE * usdPkr;
-    const copperChangePkr = copper.change * (TOLA_GRAMS / POUND_GRAMS) * usdPkr;
 
     // ==================================================
     // RESPONSE
@@ -116,13 +101,11 @@ export default async function handler(req, res) {
         goldUsdOz: gold.price,
         silverUsdOz: silver.price,
         platinumUsdOz: platinum.price,
-        copperUsdLb: copper.price,
       },
       calculatedPkr: {
         goldTola: goldTolaPkr,
         silverTola: silverTolaPkr,
         platinumTola: platinumTolaPkr,
-        copperTola: copperTolaPkr,
       },
       changes: {
         gold: {
@@ -139,11 +122,6 @@ export default async function handler(req, res) {
           amount: platinumChangePkr,
           percent: platinum.changePercent,
           direction: platinum.change > 0 ? 'up' : platinum.change < 0 ? 'down' : 'flat',
-        },
-        copper: {
-          amount: copperChangePkr,
-          percent: copper.changePercent,
-          direction: copper.change > 0 ? 'up' : copper.change < 0 ? 'down' : 'flat',
         },
       },
       usdPkr,

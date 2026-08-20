@@ -35,7 +35,6 @@ export default function Home() {
     goldTola: 0,
     silverTola: 0,
     platinumTola: 0,
-    copperTola: 0,
     usdPkr: 0,
   });
 
@@ -47,7 +46,6 @@ export default function Home() {
     gold: { usd: 0, percent: 0 },
     silver: { usd: 0, percent: 0 },
     platinum: { usd: 0, percent: 0 },
-    copper: { usd: 0, percent: 0 },
   });
 
   // --------------------------------------------------
@@ -105,7 +103,6 @@ export default function Home() {
         goldTola: Number(data?.calculatedPkr?.goldTola) || 0,
         silverTola: Number(data?.calculatedPkr?.silverTola) || 0,
         platinumTola: Number(data?.calculatedPkr?.platinumTola) || 0,
-        copperTola: Number(data?.calculatedPkr?.copperTola) || 0,
         usdPkr: Number(data?.usdPkr) || 0,
       });
 
@@ -121,10 +118,6 @@ export default function Home() {
         platinum: {
           usd: Number(data?.changes?.platinum?.amount) || 0,
           percent: Number(data?.changes?.platinum?.percent) || 0,
-        },
-        copper: {
-          usd: Number(data?.changes?.copper?.amount) || 0,
-          percent: Number(data?.changes?.copper?.percent) || 0,
         },
       });
 
@@ -417,18 +410,6 @@ export default function Home() {
         cardClass="border-teal-500/30"
         metal="platinum"
         badge="PLATINUM"
-      />
-
-      {/* COPPER */}
-      <MetalCard
-        title="Copper"
-        subtitle="Industrial Metal • 1 Tola"
-        amount={rates.copperTola}
-        icon={Activity}
-        iconClass="bg-gradient-to-br from-orange-500/20 to-amber-600/10 text-orange-600 dark:text-orange-400 border border-orange-500/30"
-        cardClass="border-orange-500/30"
-        metal="copper"
-        badge="COPPER"
       />
 
       <div className="rounded-3xl border border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur-md">
