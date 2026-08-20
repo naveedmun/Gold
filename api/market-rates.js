@@ -1,82 +1,107 @@
+// api/market-rates.js
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  // 1. Guaranteed Live Benchmarks (Fallback)
-  const BENCHMARKS = {
-    goldOunceUsd: 2650.50,
-    silverOunceUsd: 31.20,
-    platinumOunceUsd: 980.00,
-    usdPkr: 278.70,
-    goldChangePct: 0.26,
-    silverChangePct: 0.22,
-  };
-
-  // Helper for fast fetch with 3-second timeout
-  const fetchWithTimeout = async (url, options = {}) => {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 3000); // 3 sec limit
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      });
-      clearTimeout(id);
-      return response;
-    } catch (e) {
-      clearTimeout(id);
-      return null;
-    }
-  };
-
   try {
-    // 2. Try Fetching USD to PKR
-    let usdPkr = BENCHMARKS.usdPkr;
-    const forexRes = await fetchWithTimeout('https://open.er-api.com/v6/latest/USD');
-    if (forexRes && forexRes.ok) {
-      const forexData = await forexRes.json();
-      if (forexData?.rates?.PKR) {
-        usdPkr = forexData.rates.PKR;
+    // ==================================================
+    // CONSTANTS & CONVERSIONS
+    // ==================================================
+    const TOLA_GRAMS = 11.6638125;
+    const TROY_OUNCE_GRAMS = 31.1034768;
+    const TOLA_IN_TROY_OUNCE = TOLA_GRAMS / TROY_OUNCE_GRAMS;
+
+    const GOLDAPI_KEY = process.env.GOLDAPI_KEY;
+
+    if (!GOLDAPI_KEY) {
+      throw new Error('GOLDAPI_KEY environment variable is missing');
+    }
+
+    // ==================================================
+    // GOLDAPI.IO HELPER
+    // ==================================================
+    async function getGoldApiPrice(symbol) {
+      const url = `https://www.goldapi.io/api/price/${symbol}/USD`;
+
+      const response = await fetch(url, {
+        headers: {
+          'x-access-token': GOLDAPI_KEY,
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        throw new Error(`GoldAPI failed for ${symbol}: ${response.status} ${errText}`);
       }
+
+      const data = await response.json();
+
+      const price = Number(data?.price);
+      const change = Number(data?.ch ?? 0);
+      const changePercent = Number(data?.chp ?? 0);
+
+      if (!Number.isFinite(price) || price <= 0) {
+        throw new Error(`No valid price returned for ${symbol}`);
+      }
+
+      return { price, change, changePercent };
     }
 
-    // 3. Try Fetching Spot Metal Prices
-    let goldOunceUsd = BENCHMARKS.goldOunceUsd;
-    let silverOunceUsd = BENCHMARKS.silverOunceUsd;
-    let platinumOunceUsd = BENCHMARKS.platinumOunceUsd;
-    let goldChangePct = BENCHMARKS.goldChangePct;
-    let silverChangePct = BENCHMARKS.silverChangePct;
+    // ==================================================
+    // FETCH USD / PKR
+    // ==================================================
+    const currencyResponse = await fetch('https://open.er-api.com/v6/latest/USD', {
+      cache: 'no-store',
+    });
 
-    const metalRes = await fetchWithTimeout('https://api.gold-api.com/price/XAU');
-    if (metalRes && metalRes.ok) {
-      const mData = await metalRes.json();
-      if (mData?.price) goldOunceUsd = mData.price;
-      if (mData?.chp) goldChangePct = mData.chp;
+    if (!currencyResponse.ok) {
+      throw new Error(`USD/PKR API failed: ${currencyResponse.status}`);
     }
 
-    const silverRes = await fetchWithTimeout('https://api.gold-api.com/price/XAG');
-    if (silverRes && silverRes.ok) {
-      const sData = await silverRes.json();
-      if (sData?.price) silverOunceUsd = sData.price;
-      if (sData?.chp) silverChangePct = sData.chp;
+    const currencyData = await currencyResponse.json();
+    const usdPkr = Number(currencyData?.rates?.PKR);
+
+    if (!Number.isFinite(usdPkr) || usdPkr <= 0) {
+      throw new Error('USD/PKR rate unavailable');
     }
 
-    // 4. Calculations (Ounce to Tola PKR)
-    // Formula: (Price / 31.1034768) * 12.5 * USD_PKR
-    const OUNCE_TO_TOLA = 12.5 / 31.1034768;
+    // ==================================================
+    // FETCH METALS (GoldAPI symbols: XAU, XAG, XPT)
+    // ==================================================
+    const [gold, silver, platinum] = await Promise.all([
+      getGoldApiPrice('XAU'),
+      getGoldApiPrice('XAG'),
+      getGoldApiPrice('XPT'),
+    ]);
 
-    const goldTolaPkr = Math.round(goldOunceUsd * OUNCE_TO_TOLA * usdPkr);
-    const silverTolaPkr = Math.round(silverOunceUsd * OUNCE_TO_TOLA * usdPkr);
-    const platinumTolaPkr = Math.round(platinumOunceUsd * OUNCE_TO_TOLA * usdPkr);
+    // ==================================================
+    // CONVERT TO PKR PER TOLA
+    // ==================================================
+    const goldTolaPkr = gold.price * TOLA_IN_TROY_OUNCE * usdPkr;
+    const silverTolaPkr = silver.price * TOLA_IN_TROY_OUNCE * usdPkr;
+    const platinumTolaPkr = platinum.price * TOLA_IN_TROY_OUNCE * usdPkr;
 
+    // ==================================================
+    // CHANGE IN PKR PER TOLA
+    // ==================================================
+    const goldChangePkr = gold.change * TOLA_IN_TROY_OUNCE * usdPkr;
+    const silverChangePkr = silver.change * TOLA_IN_TROY_OUNCE * usdPkr;
+    const platinumChangePkr = platinum.change * TOLA_IN_TROY_OUNCE * usdPkr;
+
+    // ==================================================
+    // RESPONSE
+    // ==================================================
     return res.status(200).json({
       success: true,
-      usdPkr: usdPkr,
+      metals: {
+        goldUsdOz: gold.price,
+        silverUsdOz: silver.price,
+        platinumUsdOz: platinum.price,
+      },
       calculatedPkr: {
         goldTola: goldTolaPkr,
         silverTola: silverTolaPkr,
@@ -84,37 +109,30 @@ export default async function handler(req, res) {
       },
       changes: {
         gold: {
-          amount: Math.round((goldTolaPkr * goldChangePct) / 100),
-          percent: goldChangePct,
+          amount: goldChangePkr,
+          percent: gold.changePercent,
+          direction: gold.change > 0 ? 'up' : gold.change < 0 ? 'down' : 'flat',
         },
         silver: {
-          amount: Math.round((silverTolaPkr * silverChangePct) / 100),
-          percent: silverChangePct,
+          amount: silverChangePkr,
+          percent: silver.changePercent,
+          direction: silver.change > 0 ? 'up' : silver.change < 0 ? 'down' : 'flat',
         },
         platinum: {
-          amount: 0,
-          percent: 0,
+          amount: platinumChangePkr,
+          percent: platinum.changePercent,
+          direction: platinum.change > 0 ? 'up' : platinum.change < 0 ? 'down' : 'flat',
         },
       },
+      usdPkr,
       timestamp: new Date().toISOString(),
     });
+
   } catch (error) {
-    // Safety Net Response (Always HTTP 200)
-    const OUNCE_TO_TOLA = 12.5 / 31.1034768;
-    return res.status(200).json({
-      success: true,
-      usdPkr: BENCHMARKS.usdPkr,
-      calculatedPkr: {
-        goldTola: Math.round(BENCHMARKS.goldOunceUsd * OUNCE_TO_TOLA * BENCHMARKS.usdPkr),
-        silverTola: Math.round(BENCHMARKS.silverOunceUsd * OUNCE_TO_TOLA * BENCHMARKS.usdPkr),
-        platinumTola: Math.round(BENCHMARKS.platinumOunceUsd * OUNCE_TO_TOLA * BENCHMARKS.usdPkr),
-      },
-      changes: {
-        gold: { amount: 1200, percent: 0.26 },
-        silver: { amount: 15, percent: 0.22 },
-        platinum: { amount: 0, percent: 0 },
-      },
-      timestamp: new Date().toISOString(),
+    console.error('Market rates API error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'Market rates unavailable',
     });
   }
 }
