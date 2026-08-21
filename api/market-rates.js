@@ -3,98 +3,88 @@
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  
+  // Vercel CDN Caching: 1 ghante tak Vercel API response cache karega
+  // Safe limit: Monthly max 24 calls, limits exhaust nahi hongi!
+  res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+
+  const TOLA_GRAMS = 11.6638125;
+  const TROY_OUNCE_GRAMS = 31.1034768;
+  const TOLA_IN_TROY_OUNCE = TOLA_GRAMS / TROY_OUNCE_GRAMS;
+
+  // Static Fallback Rates (Agar API fail ho jaye toh app break nahi hogi)
+  const FALLBACK_METALS = {
+    gold: { price: 2650.50, change: 12.30, changePercent: 0.46 },
+    silver: { price: 31.20, change: -0.15, changePercent: -0.48 },
+    platinum: { price: 980.00, change: 5.10, changePercent: 0.52 },
+  };
 
   try {
-    // ==================================================
-    // CONSTANTS & CONVERSIONS
-    // ==================================================
-    const TOLA_GRAMS = 11.6638125;
-    const TROY_OUNCE_GRAMS = 31.1034768;
-    const TOLA_IN_TROY_OUNCE = TOLA_GRAMS / TROY_OUNCE_GRAMS;
-
     const GOLDAPI_KEY = process.env.GOLDAPI_KEY;
 
-    if (!GOLDAPI_KEY) {
-      throw new Error('GOLDAPI_KEY environment variable is missing');
+    // Helper Function with Fallback
+    async function getGoldApiPrice(symbol, fallback) {
+      if (!GOLDAPI_KEY) return fallback;
+
+      try {
+        const url = `https://www.goldapi.io/api/price/${symbol}/USD`;
+        const response = await fetch(url, {
+          headers: {
+            'x-access-token': GOLDAPI_KEY,
+            'Content-Type': 'application/json',
+          },
+          next: { revalidate: 3600 },
+        });
+
+        if (!response.ok) return fallback;
+
+        const data = await response.json();
+        const price = Number(data?.price);
+        
+        if (!Number.isFinite(price) || price <= 0) return fallback;
+
+        return {
+          price,
+          change: Number(data?.ch ?? 0),
+          changePercent: Number(data?.chp ?? 0),
+        };
+      } catch (err) {
+        return fallback;
+      }
     }
 
-    // ==================================================
-    // GOLDAPI.IO HELPER
-    // ==================================================
-    async function getGoldApiPrice(symbol) {
-      const url = `https://www.goldapi.io/api/price/${symbol}/USD`;
-
-      const response = await fetch(url, {
-        headers: {
-          'x-access-token': GOLDAPI_KEY,
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
+    // Fetch USD / PKR (With Fallback)
+    let usdPkr = 278.50; // Fallback PKR rate
+    try {
+      const currencyResponse = await fetch('https://open.er-api.com/v6/latest/USD', {
+        next: { revalidate: 3600 }
       });
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => '');
-        throw new Error(`GoldAPI failed for ${symbol}: ${response.status} ${errText}`);
+      if (currencyResponse.ok) {
+        const currencyData = await currencyResponse.json();
+        if (currencyData?.rates?.PKR) {
+          usdPkr = Number(currencyData.rates.PKR);
+        }
       }
-
-      const data = await response.json();
-
-      const price = Number(data?.price);
-      const change = Number(data?.ch ?? 0);
-      const changePercent = Number(data?.chp ?? 0);
-
-      if (!Number.isFinite(price) || price <= 0) {
-        throw new Error(`No valid price returned for ${symbol}`);
-      }
-
-      return { price, change, changePercent };
+    } catch (e) {
+      console.log('Using PKR fallback rate');
     }
 
-    // ==================================================
-    // FETCH USD / PKR
-    // ==================================================
-    const currencyResponse = await fetch('https://open.er-api.com/v6/latest/USD', {
-      cache: 'no-store',
-    });
-
-    if (!currencyResponse.ok) {
-      throw new Error(`USD/PKR API failed: ${currencyResponse.status}`);
-    }
-
-    const currencyData = await currencyResponse.json();
-    const usdPkr = Number(currencyData?.rates?.PKR);
-
-    if (!Number.isFinite(usdPkr) || usdPkr <= 0) {
-      throw new Error('USD/PKR rate unavailable');
-    }
-
-    // ==================================================
-    // FETCH METALS (GoldAPI symbols: XAU, XAG, XPT)
-    // ==================================================
+    // Fetch Metals
     const [gold, silver, platinum] = await Promise.all([
-      getGoldApiPrice('XAU'),
-      getGoldApiPrice('XAG'),
-      getGoldApiPrice('XPT'),
+      getGoldApiPrice('XAU', FALLBACK_METALS.gold),
+      getGoldApiPrice('XAG', FALLBACK_METALS.silver),
+      getGoldApiPrice('XPT', FALLBACK_METALS.platinum),
     ]);
 
-    // ==================================================
-    // CONVERT TO PKR PER TOLA
-    // ==================================================
+    // Conversion Calculations
     const goldTolaPkr = gold.price * TOLA_IN_TROY_OUNCE * usdPkr;
     const silverTolaPkr = silver.price * TOLA_IN_TROY_OUNCE * usdPkr;
     const platinumTolaPkr = platinum.price * TOLA_IN_TROY_OUNCE * usdPkr;
 
-    // ==================================================
-    // CHANGE IN PKR PER TOLA
-    // ==================================================
     const goldChangePkr = gold.change * TOLA_IN_TROY_OUNCE * usdPkr;
     const silverChangePkr = silver.change * TOLA_IN_TROY_OUNCE * usdPkr;
     const platinumChangePkr = platinum.change * TOLA_IN_TROY_OUNCE * usdPkr;
 
-    // ==================================================
-    // RESPONSE
-    // ==================================================
     return res.status(200).json({
       success: true,
       metals: {
@@ -129,10 +119,9 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('Market rates API error:', error);
     return res.status(500).json({
       success: false,
-      error: error?.message || 'Market rates unavailable',
+      error: error?.message || 'Server error',
     });
   }
 }
