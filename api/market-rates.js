@@ -4,57 +4,19 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
   
-  // Vercel CDN Caching: 1 ghante tak Vercel API response cache karega
-  // Safe limit: Monthly max 24 calls, limits exhaust nahi hongi!
+  // Vercel CDN Caching: 1 ghante ke liye cache taake GoldAPI free limits cross na hon
   res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
 
+  // Exact Weight Conversion Factors
   const TOLA_GRAMS = 11.6638125;
   const TROY_OUNCE_GRAMS = 31.1034768;
   const TOLA_IN_TROY_OUNCE = TOLA_GRAMS / TROY_OUNCE_GRAMS;
 
-  // Static Fallback Rates (Agar API fail ho jaye toh app break nahi hogi)
-  const FALLBACK_METALS = {
-    gold: { price: 2650.50, change: 12.30, changePercent: 0.46 },
-    silver: { price: 31.20, change: -0.15, changePercent: -0.48 },
-    platinum: { price: 980.00, change: 5.10, changePercent: 0.52 },
-  };
+  const GOLDAPI_KEY = process.env.GOLDAPI_KEY;
 
   try {
-    const GOLDAPI_KEY = process.env.GOLDAPI_KEY;
-
-    // Helper Function with Fallback
-    async function getGoldApiPrice(symbol, fallback) {
-      if (!GOLDAPI_KEY) return fallback;
-
-      try {
-        const url = `https://www.goldapi.io/api/price/${symbol}/USD`;
-        const response = await fetch(url, {
-          headers: {
-            'x-access-token': GOLDAPI_KEY,
-            'Content-Type': 'application/json',
-          },
-          next: { revalidate: 3600 },
-        });
-
-        if (!response.ok) return fallback;
-
-        const data = await response.json();
-        const price = Number(data?.price);
-        
-        if (!Number.isFinite(price) || price <= 0) return fallback;
-
-        return {
-          price,
-          change: Number(data?.ch ?? 0),
-          changePercent: Number(data?.chp ?? 0),
-        };
-      } catch (err) {
-        return fallback;
-      }
-    }
-
-    // Fetch USD / PKR (With Fallback)
-    let usdPkr = 278.50; // Fallback PKR rate
+    // 1. Fetch Live USD to PKR Rate
+    let usdPkr = 277.76; // Default Fallback
     try {
       const currencyResponse = await fetch('https://open.er-api.com/v6/latest/USD', {
         next: { revalidate: 3600 }
@@ -65,18 +27,43 @@ export default async function handler(req, res) {
           usdPkr = Number(currencyData.rates.PKR);
         }
       }
-    } catch (e) {
-      console.log('Using PKR fallback rate');
+    } catch (err) {
+      console.error('USD/PKR Fetch Error:', err);
     }
 
-    // Fetch Metals
+    // Helper for GoldAPI
+    async function getGoldApiPrice(symbol) {
+      if (!GOLDAPI_KEY) throw new Error('API Key Missing');
+
+      const url = `https://www.goldapi.io/api/price/${symbol}/USD`;
+      const response = await fetch(url, {
+        headers: {
+          'x-access-token': GOLDAPI_KEY,
+          'Content-Type': 'application/json',
+        },
+        next: { revalidate: 3600 },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        price: Number(data.price),
+        change: Number(data.ch ?? 0),
+        changePercent: Number(data.chp ?? 0),
+      };
+    }
+
+    // 2. Fetch International Spot Prices (USD/Oz)
     const [gold, silver, platinum] = await Promise.all([
-      getGoldApiPrice('XAU', FALLBACK_METALS.gold),
-      getGoldApiPrice('XAG', FALLBACK_METALS.silver),
-      getGoldApiPrice('XPT', FALLBACK_METALS.platinum),
+      getGoldApiPrice('XAU'),
+      getGoldApiPrice('XAG'),
+      getGoldApiPrice('XPT'),
     ]);
 
-    // Conversion Calculations
+    // 3. Exact Pure International Spot to PKR Tola Calculations
     const goldTolaPkr = gold.price * TOLA_IN_TROY_OUNCE * usdPkr;
     const silverTolaPkr = silver.price * TOLA_IN_TROY_OUNCE * usdPkr;
     const platinumTolaPkr = platinum.price * TOLA_IN_TROY_OUNCE * usdPkr;
@@ -119,9 +106,10 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
+    console.error('Market rates error:', error);
     return res.status(500).json({
       success: false,
-      error: error?.message || 'Server error',
+      error: error?.message || 'Failed to fetch live market rates',
     });
   }
 }
