@@ -3,25 +3,45 @@
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
-  
-  // Vercel CDN par response cache karein taake requests limit exhaust na hon
-  res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+  res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
 
   const TOLA_GRAMS = 11.6638125;
   const TROY_OUNCE_GRAMS = 31.1034768;
   const TOLA_IN_TROY_OUNCE = TOLA_GRAMS / TROY_OUNCE_GRAMS;
 
-  // Static Fallback Data (Jab GoldAPI limit over ho jaye)
-  const FALLBACK_METALS = {
-    gold: { price: 2510.50, change: 12.30, changePercent: 0.49 },
-    silver: { price: 29.50, change: -0.15, changePercent: -0.50 },
-    platinum: { price: 950.00, change: 4.10, changePercent: 0.43 },
-  };
-
-  const GOLDAPI_KEY = process.env.GOLDAPI_KEY;
-
   try {
-    // 1. Fetch USD to PKR
+    // 1. Fetch Live Spot Metals from Yahoo Finance (GC=F Gold, SI=F Silver, PL=F Platinum)
+    const yahooUrl = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols=GC=F,SI=F,PL=F';
+    const metalsRes = await fetch(yahooUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      next: { revalidate: 300 }
+    });
+
+    if (!metalsRes.ok) throw new Error('Yahoo Finance API failed');
+    const metalsData = await metalsRes.json();
+    const results = metalsData?.quoteResponse?.result || [];
+
+    const goldData = results.find(item => item.symbol === 'GC=F');
+    const silverData = results.find(item => item.symbol === 'SI=F');
+    const platData = results.find(item => item.symbol === 'PL=F');
+
+    const gold = {
+      price: goldData?.regularMarketPrice || 0,
+      change: goldData?.regularMarketChange || 0,
+      changePercent: goldData?.regularMarketChangePercent || 0
+    };
+    const silver = {
+      price: silverData?.regularMarketPrice || 0,
+      change: silverData?.regularMarketChange || 0,
+      changePercent: silverData?.regularMarketChangePercent || 0
+    };
+    const platinum = {
+      price: platData?.regularMarketPrice || 0,
+      change: platData?.regularMarketChange || 0,
+      changePercent: platData?.regularMarketChangePercent || 0
+    };
+
+    // 2. Fetch Live USD to PKR Rate
     let usdPkr = 277.76;
     try {
       const currencyResponse = await fetch('https://open.er-api.com/v6/latest/USD', {
@@ -33,49 +53,11 @@ export default async function handler(req, res) {
           usdPkr = Number(currencyData.rates.PKR);
         }
       }
-    } catch (err) {
-      console.log('Using default USD/PKR rate');
+    } catch (e) {
+      console.error('USD/PKR fetch error');
     }
 
-    // Safe Helper Function
-    async function getGoldApiPrice(symbol, fallback) {
-      if (!GOLDAPI_KEY) return fallback;
-
-      try {
-        const url = `https://www.goldapi.io/api/price/${symbol}/USD`;
-        const response = await fetch(url, {
-          headers: {
-            'x-access-token': GOLDAPI_KEY,
-            'Content-Type': 'application/json',
-          },
-          next: { revalidate: 3600 },
-        });
-
-        if (!response.ok) return fallback;
-
-        const data = await response.json();
-        const price = Number(data?.price);
-        
-        if (!Number.isFinite(price) || price <= 0) return fallback;
-
-        return {
-          price,
-          change: Number(data?.ch ?? 0),
-          changePercent: Number(data?.chp ?? 0),
-        };
-      } catch (err) {
-        return fallback; // Direct error return karne ke bajaye fallback rate dega
-      }
-    }
-
-    // 2. Fetch Metals (Safe Fetch)
-    const [gold, silver, platinum] = await Promise.all([
-      getGoldApiPrice('XAU', FALLBACK_METALS.gold),
-      getGoldApiPrice('XAG', FALLBACK_METALS.silver),
-      getGoldApiPrice('XPT', FALLBACK_METALS.platinum),
-    ]);
-
-    // 3. International Spot to PKR Tola Calculations
+    // 3. Convert Spot USD/Oz to PKR Per Tola
     const goldTolaPkr = gold.price * TOLA_IN_TROY_OUNCE * usdPkr;
     const silverTolaPkr = silver.price * TOLA_IN_TROY_OUNCE * usdPkr;
     const platinumTolaPkr = platinum.price * TOLA_IN_TROY_OUNCE * usdPkr;
@@ -120,7 +102,7 @@ export default async function handler(req, res) {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      error: error?.message || 'Server Error',
+      error: error?.message || 'Live rates fetch failed',
     });
   }
 }
